@@ -1,4 +1,4 @@
-import { LayoutDashboard, Package, Palette, Users, UsersRound } from "lucide-react";
+import { LayoutDashboard, Package, Palette, Users, UsersRound, Warehouse } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { RoleGate } from "@/components/RoleGate";
@@ -14,6 +14,7 @@ const navItems = [
 const settingsItems = [
   { to: "/settings/branding", key: "nav.branding", icon: Palette },
   { to: "/settings/users", key: "nav.users", icon: UsersRound },
+  { to: "/settings/stations", key: "nav.stations", icon: Warehouse },
 ];
 
 function navLinkClass({ isActive }: { isActive: boolean }) {

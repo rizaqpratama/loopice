@@ -49,10 +49,12 @@ model Tenant {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  users        User[]
-  customers    Customer[]
+  users         User[]
+  customers     Customer[]
   serviceOrders ServiceOrder[]
-  shipments    Shipment[]
+  shipments     Shipment[]
+  stations      Station[]
+  shipmentLegs  ShipmentLeg[]
 
   @@index([isActive])
 }
@@ -73,6 +75,7 @@ model User {
 
   serviceOrdersCreated      ServiceOrder[]              @relation("ServiceOrderCreatedBy")
   serviceOrderStatusChanges ServiceOrderStatusHistory[] @relation("ServiceOrderStatusChangedBy")
+  shipmentLegStatusChanges  ShipmentLegStatusHistory[]  @relation("ShipmentLegStatusChangedBy")
 
   // Composite unique keeps email unique per tenant. Note: Postgres treats each
   // NULL tenantId as distinct, so this alone does not guarantee globally-unique
@@ -119,7 +122,7 @@ model ServiceOrder {
 
   statusHistory ServiceOrderStatusHistory[]
   shipments     Shipment[]
-  // future (phase 2): station-to-station routing/legs per shipment
+  shipmentLegs  ShipmentLeg[]
 
   @@unique([tenantId, soNumber])
   @@index([tenantId, status])
@@ -162,14 +165,77 @@ model Shipment {
   @@index([serviceOrderId])
 }
 
-// -- FUTURE (phase 2): inter-city / inter-station routing for shipments
-// model Station {
-//   id, tenantId, name, city, address, ...
-// }
-// model ShipmentLeg {
-//   id, tenantId, shipmentId, originStationId, destStationId,
-//   status, legSequence, vehicleId, driverId, ...
-// }
+enum ShipmentLegStatus {
+  PLANNED
+  IN_TRANSIT
+  ARRIVED
+  CANCELLED
+}
+
+// A tenant's reference/master data for inter-city routing hubs. No
+// lifecycle of its own -- managed as simple directory data (create/
+// update/deactivate) by TENANT_ADMIN, but readable by DISPATCHER too
+// since they need it to plan routes.
+model Station {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  code      String
+  name      String
+  city      String
+  address   String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  originLegs ShipmentLeg[] @relation("ShipmentLegOrigin")
+  destLegs   ShipmentLeg[] @relation("ShipmentLegDest")
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+// One station-to-station hop within a Service Order's overall route.
+// legSequence orders legs 1..n for a given SO. No vehicle/driver yet --
+// those are phase 3 (fleet management); adding unconstrained placeholder
+// columns now would just be schema debt to retrofit into real FKs later.
+model ShipmentLeg {
+  id              String            @id @default(cuid())
+  tenantId        String
+  tenant          Tenant            @relation(fields: [tenantId], references: [id])
+  serviceOrderId  String
+  serviceOrder    ServiceOrder      @relation(fields: [serviceOrderId], references: [id])
+  legSequence     Int
+  originStationId String
+  originStation   Station           @relation("ShipmentLegOrigin", fields: [originStationId], references: [id])
+  destStationId   String
+  destStation     Station           @relation("ShipmentLegDest", fields: [destStationId], references: [id])
+  status          ShipmentLegStatus @default(PLANNED)
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  statusHistory ShipmentLegStatusHistory[]
+
+  @@unique([serviceOrderId, legSequence])
+  @@index([tenantId])
+  @@index([serviceOrderId])
+  @@index([originStationId])
+  @@index([destStationId])
+}
+
+model ShipmentLegStatusHistory {
+  id            String            @id @default(cuid())
+  shipmentLegId String
+  shipmentLeg   ShipmentLeg       @relation(fields: [shipmentLegId], references: [id])
+  status        ShipmentLegStatus
+  note          String?
+  changedById   String?
+  changedBy     User?             @relation("ShipmentLegStatusChangedBy", fields: [changedById], references: [id])
+  changedAt     DateTime          @default(now())
+
+  @@index([shipmentLegId])
+}
 
 // -- FUTURE (phase 3): fleet management
 // model Vehicle {

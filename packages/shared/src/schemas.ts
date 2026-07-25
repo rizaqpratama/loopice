@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { SERVICE_ORDER_STATUSES } from "./serviceOrderStatus";
+import { SHIPMENT_LEG_STATUSES } from "./shipmentLegStatus";
 import { SHIPMENT_TYPES } from "./shipmentType";
 import { USER_ROLES } from "./roles";
 
@@ -93,3 +94,34 @@ export const createShipmentSchema = z.object({
 });
 
 export const updateShipmentSchema = createShipmentSchema.partial();
+
+export const createStationSchema = z.object({
+  code: z
+    .string()
+    .min(1)
+    .max(20)
+    .regex(/^[A-Z0-9-]+$/, "uppercase letters, numbers, and hyphens only"),
+  name: z.string().min(1),
+  city: z.string().min(1),
+  address: z.string().optional(),
+});
+
+export const updateStationSchema = createStationSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+export const createShipmentLegSchema = z
+  .object({
+    originStationId: z.string().min(1),
+    destStationId: z.string().min(1),
+    notes: z.string().optional(),
+  })
+  .refine((data) => data.originStationId !== data.destStationId, {
+    message: "Origin and destination station must differ",
+    path: ["destStationId"],
+  });
+
+export const updateShipmentLegStatusSchema = z.object({
+  status: z.enum(SHIPMENT_LEG_STATUSES),
+  note: z.string().optional(),
+});

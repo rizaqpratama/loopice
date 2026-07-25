@@ -1,6 +1,7 @@
-import type { ServiceOrderStatus, ShipmentType } from "@loopice/shared";
+import type { ServiceOrderStatus, ShipmentLegStatus, ShipmentType } from "@loopice/shared";
 import { apiRequest } from "./client";
 import type { Customer, PaginatedResult } from "./customers.api";
+import type { Station } from "./stations.api";
 
 export interface ServiceOrderStatusHistoryEntry {
   id: string;
@@ -23,6 +24,28 @@ export interface Shipment {
   updatedAt: string;
 }
 
+export interface ShipmentLegStatusHistoryEntry {
+  id: string;
+  status: ShipmentLegStatus;
+  note: string | null;
+  changedAt: string;
+}
+
+export interface ShipmentLeg {
+  id: string;
+  serviceOrderId: string;
+  legSequence: number;
+  originStationId: string;
+  originStation: Station;
+  destStationId: string;
+  destStation: Station;
+  status: ShipmentLegStatus;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  statusHistory: ShipmentLegStatusHistoryEntry[];
+}
+
 export interface ServiceOrder {
   id: string;
   tenantId: string;
@@ -38,6 +61,7 @@ export interface ServiceOrder {
   updatedAt: string;
   statusHistory: ServiceOrderStatusHistoryEntry[];
   shipments: Shipment[];
+  shipmentLegs: ShipmentLeg[];
 }
 
 export interface ListServiceOrdersParams {
@@ -110,4 +134,28 @@ export function updateShipment(id: string, input: Partial<ShipmentInput>) {
 
 export function deleteShipment(id: string) {
   return apiRequest<void>(`/shipments/${id}`, { method: "DELETE" });
+}
+
+export interface ShipmentLegInput {
+  originStationId: string;
+  destStationId: string;
+  notes?: string;
+}
+
+export function createShipmentLeg(serviceOrderId: string, input: ShipmentLegInput) {
+  return apiRequest<ShipmentLeg>(`/service-orders/${serviceOrderId}/legs`, {
+    method: "POST",
+    body: input,
+  });
+}
+
+export function updateShipmentLegStatus(id: string, status: ShipmentLegStatus, note?: string) {
+  return apiRequest<ShipmentLeg>(`/shipment-legs/${id}/status`, {
+    method: "PATCH",
+    body: { status, note },
+  });
+}
+
+export function deleteShipmentLeg(id: string) {
+  return apiRequest<void>(`/shipment-legs/${id}`, { method: "DELETE" });
 }

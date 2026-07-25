@@ -6,6 +6,14 @@ import { BadRequestError, NotFoundError } from "../../lib/httpError";
 const SERVICE_ORDER_INCLUDE = {
   customer: true,
   shipments: true,
+  shipmentLegs: {
+    include: {
+      originStation: true,
+      destStation: true,
+      statusHistory: { orderBy: { changedAt: "asc" as const } },
+    },
+    orderBy: { legSequence: "asc" as const },
+  },
   statusHistory: { orderBy: { changedAt: "asc" as const } },
 } satisfies Prisma.ServiceOrderInclude;
 

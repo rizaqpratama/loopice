@@ -33,6 +33,49 @@ async function findOrCreateCustomer(
   return prisma.customer.create({ data: { tenantId, ...data } });
 }
 
+async function findOrCreateStation(
+  tenantId: string,
+  data: { code: string; name: string; city: string; address: string }
+) {
+  const existing = await prisma.station.findUnique({
+    where: { tenantId_code: { tenantId, code: data.code } },
+  });
+  if (existing) return existing;
+  return prisma.station.create({ data: { tenantId, ...data } });
+}
+
+type LegStatus = "PLANNED" | "IN_TRANSIT" | "ARRIVED";
+
+async function createSeedLeg(
+  tenantId: string,
+  serviceOrderId: string,
+  legSequence: number,
+  originStationId: string,
+  destStationId: string,
+  finalStatus: LegStatus,
+  changedById: string
+) {
+  const leg = await prisma.shipmentLeg.create({
+    data: { tenantId, serviceOrderId, legSequence, originStationId, destStationId, status: "PLANNED" },
+  });
+  await prisma.shipmentLegStatusHistory.create({
+    data: { shipmentLegId: leg.id, status: "PLANNED", changedById },
+  });
+
+  const stepsToFinalStatus: Record<LegStatus, ("IN_TRANSIT" | "ARRIVED")[]> = {
+    PLANNED: [],
+    IN_TRANSIT: ["IN_TRANSIT"],
+    ARRIVED: ["IN_TRANSIT", "ARRIVED"],
+  };
+  for (const step of stepsToFinalStatus[finalStatus]) {
+    await prisma.shipmentLeg.update({ where: { id: leg.id }, data: { status: step } });
+    await prisma.shipmentLegStatusHistory.create({
+      data: { shipmentLegId: leg.id, status: step, changedById },
+    });
+  }
+  return leg;
+}
+
 async function main() {
   const passwordHash = await hashPassword(DEMO_PASSWORD);
 
@@ -88,6 +131,18 @@ async function main() {
     customers.push(await findOrCreateCustomer(tenant.id, seed));
   }
 
+  const stationSeeds = [
+    { code: "JKT-01", name: "Jakarta Hub", city: "Jakarta", address: "Jl. Gudang Selatan 1, Jakarta" },
+    { code: "BDG-01", name: "Bandung Depot", city: "Bandung", address: "Jl. Soekarno-Hatta 200, Bandung" },
+    { code: "SBY-01", name: "Surabaya Depot", city: "Surabaya", address: "Jl. Kalianak 15, Surabaya" },
+    { code: "SMG-01", name: "Semarang Depot", city: "Semarang", address: "Jl. Kaligawe 88, Semarang" },
+  ];
+  const stations = [];
+  for (const seed of stationSeeds) {
+    stations.push(await findOrCreateStation(tenant.id, seed));
+  }
+  const [jakarta, bandung, surabaya] = stations;
+
   const existingServiceOrders = await prisma.serviceOrder.count({ where: { tenantId: tenant.id } });
   if (existingServiceOrders === 0) {
     const finalStatuses = [
@@ -114,6 +169,15 @@ async function main() {
       BILLED: ["QUOTED", "CONFIRMED", "PLANNED", "IN_PROGRESS", "COMPLETED", "BILLED"],
       CLOSED: ["QUOTED", "CONFIRMED", "PLANNED", "IN_PROGRESS", "COMPLETED", "BILLED", "CLOSED"],
       CANCELLED: ["QUOTED", "CANCELLED"],
+    };
+
+    // Only the SOs whose route has actually started planning get a seeded
+    // route -- earlier-stage SOs (DRAFT/QUOTED/CONFIRMED) haven't reached
+    // routing yet, and CANCELLED/BILLED/CLOSED don't need a fresh one.
+    const legStatusesByFinalStatus: Partial<Record<(typeof finalStatuses)[number], [LegStatus, LegStatus]>> = {
+      PLANNED: ["PLANNED", "PLANNED"],
+      IN_PROGRESS: ["ARRIVED", "IN_TRANSIT"],
+      COMPLETED: ["ARRIVED", "ARRIVED"],
     };
 
     const shipmentTemplates = [
@@ -160,6 +224,12 @@ async function main() {
         await prisma.shipment.create({
           data: { tenantId: tenant.id, serviceOrderId: serviceOrder.id, ...secondTemplate },
         });
+      }
+
+      const legStatuses = legStatusesByFinalStatus[finalStatus];
+      if (legStatuses && jakarta && bandung && surabaya) {
+        await createSeedLeg(tenant.id, serviceOrder.id, 1, jakarta.id, bandung.id, legStatuses[0], admin.id);
+        await createSeedLeg(tenant.id, serviceOrder.id, 2, bandung.id, surabaya.id, legStatuses[1], admin.id);
       }
     }
   }

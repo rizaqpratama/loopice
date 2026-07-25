@@ -1,6 +1,5 @@
 import type { ServiceOrderStatus } from "@loopice/shared";
-import { useTranslation } from "react-i18next";
-import { cn } from "@/lib/utils";
+import { Stamp } from "@/components/status/Stamp";
 
 // The signature element: SO status renders as an ink stamp, the way a
 // waybill or manifest actually gets marked as it moves through a depot.
@@ -55,18 +54,14 @@ export function StatusStamp({
   className?: string;
   ringOffset?: string;
 }) {
-  const { t } = useTranslation();
   return (
-    <span
-      className={cn(
-        "inline-flex items-center justify-center whitespace-nowrap rounded-sm border-2 border-current px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-widest ring-1 ring-offset-2",
-        STAMP_STYLES[status],
-        STAMP_ROTATION[status],
-        ringOffset,
-        className
-      )}
-    >
-      {t(`status.${status}`)}
-    </span>
+    <Stamp
+      status={status}
+      stampStyles={STAMP_STYLES}
+      stampRotation={STAMP_ROTATION}
+      i18nPrefix="status"
+      className={className}
+      ringOffset={ringOffset}
+    />
   );
 }

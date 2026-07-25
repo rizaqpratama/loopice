@@ -15,7 +15,8 @@
     "serviceOrders": "Pesanan Layanan",
     "settings": "Pengaturan",
     "branding": "Merek",
-    "users": "Pengguna"
+    "users": "Pengguna",
+    "stations": "Stasiun"
   },
   "auth": {
     "welcomeBack": "Selamat datang kembali",
@@ -115,7 +116,20 @@
     "noShipments": "Belum ada palet, kontainer, atau paket ditambahkan.",
     "noFurtherDetail": "Tidak ada detail lain",
     "removeShipment": "Hapus pengiriman",
-    "statusHistory": "Riwayat status"
+    "statusHistory": "Riwayat status",
+    "route": "Rute",
+    "addLeg": "Tambah etape",
+    "legOriginStation": "Stasiun asal",
+    "legDestStation": "Stasiun tujuan",
+    "selectStation": "Pilih stasiun…",
+    "legNotes": "Catatan",
+    "legNotesPlaceholder": "mis. Kargo prioritas, tangani dengan hati-hati",
+    "legLabel": "Etape {{sequence}}",
+    "noLegs": "Belum ada etape rute ditambahkan.",
+    "failedToAddLeg": "Gagal menambahkan etape",
+    "removeLeg": "Hapus etape",
+    "failedToRemoveLeg": "Gagal menghapus etape",
+    "failedToUpdateLegStatus": "Gagal memperbarui status etape"
   },
   "settings": {
     "branding": {
@@ -147,6 +161,24 @@
       "active": "Aktif",
       "deactivated": "Nonaktif",
       "deactivate": "Nonaktifkan"
+    },
+    "stations": {
+      "eyebrow": "Jaringan",
+      "title": "Stasiun",
+      "newStation": "Stasiun baru",
+      "codePlaceholder": "Kode (mis. JKT-01)",
+      "namePlaceholder": "Nama",
+      "cityPlaceholder": "Kota",
+      "addressPlaceholder": "Alamat",
+      "createStation": "Buat stasiun",
+      "failedToCreate": "Gagal membuat stasiun",
+      "colCode": "Kode",
+      "colName": "Nama",
+      "colCity": "Kota",
+      "colStatus": "Status",
+      "active": "Aktif",
+      "deactivated": "Nonaktif",
+      "deactivate": "Nonaktifkan"
     }
   },
   "status": {
@@ -164,6 +196,12 @@
     "PALLET": "Palet",
     "CONTAINER": "Kontainer",
     "PARCEL": "Paket"
+  },
+  "shipmentLegStatus": {
+    "PLANNED": "Direncanakan",
+    "IN_TRANSIT": "Dalam Perjalanan",
+    "ARRIVED": "Tiba",
+    "CANCELLED": "Dibatalkan"
   },
   "role": {
     "SUPERADMIN": "Super Admin",

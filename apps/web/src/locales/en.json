@@ -15,7 +15,8 @@
     "serviceOrders": "Service Orders",
     "settings": "Settings",
     "branding": "Branding",
-    "users": "Users"
+    "users": "Users",
+    "stations": "Stations"
   },
   "auth": {
     "welcomeBack": "Welcome back",
@@ -116,7 +117,20 @@
     "noShipments": "No pallets, containers, or parcels added yet.",
     "noFurtherDetail": "No further detail",
     "removeShipment": "Remove shipment",
-    "statusHistory": "Status history"
+    "statusHistory": "Status history",
+    "route": "Route",
+    "addLeg": "Add leg",
+    "legOriginStation": "Origin station",
+    "legDestStation": "Destination station",
+    "selectStation": "Select a station…",
+    "legNotes": "Notes",
+    "legNotesPlaceholder": "e.g. Priority cargo, handle with care",
+    "legLabel": "Leg {{sequence}}",
+    "noLegs": "No route legs added yet.",
+    "failedToAddLeg": "Failed to add leg",
+    "removeLeg": "Remove leg",
+    "failedToRemoveLeg": "Failed to remove leg",
+    "failedToUpdateLegStatus": "Failed to update leg status"
   },
   "settings": {
     "branding": {
@@ -148,6 +162,24 @@
       "active": "Active",
       "deactivated": "Deactivated",
       "deactivate": "Deactivate"
+    },
+    "stations": {
+      "eyebrow": "Network",
+      "title": "Stations",
+      "newStation": "New station",
+      "codePlaceholder": "Code (e.g. JKT-01)",
+      "namePlaceholder": "Name",
+      "cityPlaceholder": "City",
+      "addressPlaceholder": "Address",
+      "createStation": "Create station",
+      "failedToCreate": "Failed to create station",
+      "colCode": "Code",
+      "colName": "Name",
+      "colCity": "City",
+      "colStatus": "Status",
+      "active": "Active",
+      "deactivated": "Deactivated",
+      "deactivate": "Deactivate"
     }
   },
   "status": {
@@ -165,6 +197,12 @@
     "PALLET": "Pallet",
     "CONTAINER": "Container",
     "PARCEL": "Parcel"
+  },
+  "shipmentLegStatus": {
+    "PLANNED": "Planned",
+    "IN_TRANSIT": "In Transit",
+    "ARRIVED": "Arrived",
+    "CANCELLED": "Cancelled"
   },
   "role": {
     "SUPERADMIN": "Super Admin",

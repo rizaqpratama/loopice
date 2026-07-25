@@ -11,6 +11,7 @@ import { ServiceOrderCreatePage } from "@/pages/serviceOrders/ServiceOrderCreate
 import { ServiceOrderDetailPage } from "@/pages/serviceOrders/ServiceOrderDetailPage";
 import { TenantBrandingSettingsPage } from "@/pages/settings/TenantBrandingSettingsPage";
 import { UserManagementPage } from "@/pages/settings/UserManagementPage";
+import { StationsSettingsPage } from "@/pages/settings/StationsSettingsPage";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -47,6 +48,16 @@ export function AppRouter() {
           <Shell>
             <RoleGate allow={["TENANT_ADMIN"]} fallback={<Navigate to="/" replace />}>
               <UserManagementPage />
+            </RoleGate>
+          </Shell>
+        }
+      />
+      <Route
+        path="/settings/stations"
+        element={
+          <Shell>
+            <RoleGate allow={["TENANT_ADMIN"]} fallback={<Navigate to="/" replace />}>
+              <StationsSettingsPage />
             </RoleGate>
           </Shell>
         }
