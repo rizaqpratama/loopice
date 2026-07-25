@@ -1,7 +1,9 @@
 import * as React from "react";
+import { Plus } from "lucide-react";
 import type { AuthUser, UserRole } from "@loopice/shared";
 import * as usersApi from "@/api/users.api";
 import { ApiError } from "@/api/client";
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -55,9 +57,25 @@ export function UserManagementPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">Users</h1>
-        <Button onClick={() => setShowForm((v) => !v)}>{showForm ? "Cancel" : "+ New user"}</Button>
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            Team
+          </p>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+            Users
+          </h1>
+        </div>
+        <Button onClick={() => setShowForm((v) => !v)}>
+          {showForm ? (
+            "Cancel"
+          ) : (
+            <>
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              New user
+            </>
+          )}
+        </Button>
       </div>
 
       {showForm && (
@@ -125,10 +143,17 @@ export function UserManagementPage() {
             {users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
-                  {user.firstName} {user.lastName}
+                  <div className="flex items-center gap-2.5 font-medium text-foreground">
+                    <Avatar name={`${user.firstName} ${user.lastName}`} size="sm" />
+                    {user.firstName} {user.lastName}
+                  </div>
                 </TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.role}</TableCell>
+                <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                <TableCell>
+                  <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                    {user.role.replace("_", " ")}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <Badge variant={user.isActive ? "success" : "secondary"}>
                     {user.isActive ? "Active" : "Deactivated"}

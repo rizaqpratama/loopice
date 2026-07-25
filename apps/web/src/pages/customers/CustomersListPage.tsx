@@ -1,9 +1,11 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
+import { Plus, Search, Users } from "lucide-react";
 import * as customersApi from "@/api/customers.api";
 import type { Customer } from "@/api/customers.api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Avatar } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
@@ -51,9 +53,19 @@ export function CustomersListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">Customers</h1>
-        <Button onClick={() => setShowForm((v) => !v)}>{showForm ? "Cancel" : "+ New customer"}</Button>
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            Customer ledger
+          </p>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+            Customers
+          </h1>
+        </div>
+        <Button onClick={() => setShowForm((v) => !v)}>
+          <Plus className="h-4 w-4" strokeWidth={2.5} />
+          New customer
+        </Button>
       </div>
 
       {showForm && (
@@ -91,11 +103,18 @@ export function CustomersListPage() {
       )}
 
       <form onSubmit={handleSearchSubmit} className="flex max-w-sm gap-2">
-        <Input
-          placeholder="Search by name…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="relative flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            strokeWidth={2}
+          />
+          <Input
+            placeholder="Search by name…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
         <Button type="submit" variant="outline">
           Search
         </Button>
@@ -121,8 +140,11 @@ export function CustomersListPage() {
             )}
             {!isLoading && customers.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
-                  No customers yet.
+                <TableCell colSpan={4}>
+                  <div className="flex flex-col items-center gap-2 py-10 text-center">
+                    <Users className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
+                    <p className="text-sm text-muted-foreground">No customers on file yet.</p>
+                  </div>
                 </TableCell>
               </TableRow>
             )}
@@ -131,14 +153,17 @@ export function CustomersListPage() {
                 <TableCell>
                   <Link
                     to={`/customers/${customer.id}`}
-                    className="font-medium text-brand-primary hover:underline"
+                    className="flex items-center gap-2.5 font-medium text-foreground hover:text-brand-primary"
                   >
+                    <Avatar name={customer.name} size="sm" />
                     {customer.name}
                   </Link>
                 </TableCell>
-                <TableCell>{customer.email ?? "—"}</TableCell>
-                <TableCell>{customer.phone ?? "—"}</TableCell>
-                <TableCell>{customer.address ?? "—"}</TableCell>
+                <TableCell className="text-muted-foreground">{customer.email ?? "—"}</TableCell>
+                <TableCell className="font-mono text-sm text-muted-foreground">
+                  {customer.phone ?? "—"}
+                </TableCell>
+                <TableCell className="text-muted-foreground">{customer.address ?? "—"}</TableCell>
               </TableRow>
             ))}
           </TableBody>

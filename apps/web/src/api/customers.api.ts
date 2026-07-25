@@ -1,3 +1,4 @@
+import type { OrderStatus } from "@loopice/shared";
 import { apiRequest } from "./client";
 
 export interface Customer {
@@ -13,7 +14,7 @@ export interface Customer {
 }
 
 export interface CustomerWithOrders extends Customer {
-  orders: Array<{ id: string; orderNumber: string; status: string; createdAt: string }>;
+  orders: Array<{ id: string; orderNumber: string; status: OrderStatus; createdAt: string }>;
 }
 
 export interface PaginatedResult<T> {

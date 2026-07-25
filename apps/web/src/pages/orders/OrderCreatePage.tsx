@@ -1,5 +1,6 @@
 import * as React from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { ArrowLeft, MapPin } from "lucide-react";
 import * as customersApi from "@/api/customers.api";
 import type { Customer } from "@/api/customers.api";
 import * as ordersApi from "@/api/orders.api";
@@ -45,11 +46,25 @@ export function OrderCreatePage() {
 
   return (
     <div className="flex max-w-lg flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-foreground">New order</h1>
+      <div>
+        <Link
+          to="/orders"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
+          Orders
+        </Link>
+        <p className="mt-2 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          New waybill
+        </p>
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+          Create order
+        </h1>
+      </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Order details</CardTitle>
+          <CardTitle>Customer &amp; cargo</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -82,18 +97,36 @@ export function OrderCreatePage() {
               />
             </div>
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="origin">Origin address</Label>
-              <Input
-                id="origin"
-                value={originAddress}
-                onChange={(e) => setOriginAddress(e.target.value)}
-              />
-            </div>
+            <div className="relative flex flex-col gap-3 py-1">
+              <div className="absolute left-[9px] top-5 h-[calc(100%-40px)] w-px border-l border-dashed border-border" />
 
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="dest">Destination address</Label>
-              <Input id="dest" value={destAddress} onChange={(e) => setDestAddress(e.target.value)} />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="origin" className="flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
+                  Origin
+                </Label>
+                <Input
+                  id="origin"
+                  value={originAddress}
+                  onChange={(e) => setOriginAddress(e.target.value)}
+                  placeholder="Pickup address"
+                  className="ml-5"
+                />
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="dest" className="flex items-center gap-1.5">
+                  <MapPin className="h-3.5 w-3.5 text-brand-primary" strokeWidth={2} />
+                  Destination
+                </Label>
+                <Input
+                  id="dest"
+                  value={destAddress}
+                  onChange={(e) => setDestAddress(e.target.value)}
+                  placeholder="Drop-off address"
+                  className="ml-5"
+                />
+              </div>
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}

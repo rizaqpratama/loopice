@@ -1,14 +1,15 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
+import { Package, Plus } from "lucide-react";
 import type { OrderStatus } from "@loopice/shared";
 import { ORDER_STATUSES } from "@loopice/shared";
 import * as ordersApi from "@/api/orders.api";
 import type { Order } from "@/api/orders.api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { OrderStatusBadge } from "./statusBadge";
+import { STATUS_INK, StatusStamp } from "./statusBadge";
 
 export function OrdersListPage() {
   const [orders, setOrders] = React.useState<Order[]>([]);
@@ -28,25 +29,48 @@ export function OrdersListPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">Orders</h1>
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            Order ledger
+          </p>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+            Orders
+          </h1>
+        </div>
         <Link to="/orders/new">
-          <Button>+ New order</Button>
+          <Button>
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            New order
+          </Button>
         </Link>
       </div>
 
-      <Select
-        className="max-w-xs"
-        value={status}
-        onChange={(e) => setStatus(e.target.value as OrderStatus | "")}
-      >
-        <option value="">All statuses</option>
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setStatus("")}
+          className={cn(
+            "rounded-sm border-2 px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-widest transition-colors",
+            status === ""
+              ? "border-foreground text-foreground"
+              : "border-border text-muted-foreground hover:border-foreground/40"
+          )}
+        >
+          All
+        </button>
         {ORDER_STATUSES.map((s) => (
-          <option key={s} value={s}>
+          <button
+            key={s}
+            onClick={() => setStatus(s)}
+            className={cn(
+              "rounded-sm border-2 px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-widest transition-colors",
+              status === s ? STATUS_INK[s] : "border-border text-muted-foreground hover:border-foreground/40"
+            )}
+          >
             {s.replace("_", " ")}
-          </option>
+          </button>
         ))}
-      </Select>
+      </div>
 
       <Card>
         <Table>
@@ -68,8 +92,11 @@ export function OrdersListPage() {
             )}
             {!isLoading && orders.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
-                  No orders found.
+                <TableCell colSpan={4}>
+                  <div className="flex flex-col items-center gap-2 py-10 text-center">
+                    <Package className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
+                    <p className="text-sm text-muted-foreground">No orders found.</p>
+                  </div>
                 </TableCell>
               </TableRow>
             )}
@@ -78,16 +105,18 @@ export function OrdersListPage() {
                 <TableCell>
                   <Link
                     to={`/orders/${order.id}`}
-                    className="font-medium text-brand-primary hover:underline"
+                    className="font-mono text-sm font-medium text-foreground hover:text-brand-primary"
                   >
                     {order.orderNumber}
                   </Link>
                 </TableCell>
                 <TableCell>{order.customer.name}</TableCell>
                 <TableCell>
-                  <OrderStatusBadge status={order.status} />
+                  <StatusStamp status={order.status} ringOffset="ring-offset-card" />
                 </TableCell>
-                <TableCell>{new Date(order.createdAt).toLocaleDateString()}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {new Date(order.createdAt).toLocaleDateString()}
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

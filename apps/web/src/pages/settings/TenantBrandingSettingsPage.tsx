@@ -48,11 +48,23 @@ export function TenantBrandingSettingsPage() {
 
   return (
     <div className="flex max-w-lg flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-foreground">Branding</h1>
+      <div>
+        <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+          Whitelabel
+        </p>
+        <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+          Branding
+        </h1>
+      </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Whitelabel settings</CardTitle>
+        <CardHeader className="flex-row items-center justify-between space-y-0">
+          <CardTitle>Company identity</CardTitle>
+          <div
+            className="h-6 w-6 rounded-sm border border-border"
+            style={{ backgroundColor: primaryColor }}
+            aria-hidden
+          />
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -86,7 +98,7 @@ export function TenantBrandingSettingsPage() {
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
-            {saved && <p className="text-sm text-emerald-400">Saved.</p>}
+            {saved && <p className="text-sm text-emerald-700">Saved.</p>}
 
             <Button type="submit" disabled={isSaving}>
               {isSaving ? "Saving…" : "Save branding"}
