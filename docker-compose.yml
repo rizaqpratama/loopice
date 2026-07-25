@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: loopice
+      POSTGRES_PASSWORD: loopice
+      POSTGRES_DB: loopice_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - loopice_pgdata:/var/lib/postgresql/data
+
+volumes:
+  loopice_pgdata:
