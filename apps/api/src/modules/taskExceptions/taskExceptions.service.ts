@@ -1,6 +1,7 @@
 import { canTransitionExceptionStatus, type ExceptionSeverity, type ExceptionStatus } from "@loopice/shared";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
+import { domainEvents } from "../../lib/domainEvents";
 import { BadRequestError, NotFoundError } from "../../lib/httpError";
 import { SAFE_USER_SELECT } from "../../lib/safeUserSelect";
 
@@ -80,5 +81,13 @@ export async function updateException(
     }
   }
 
-  return prisma.taskException.update({ where: { id }, data, include: EXCEPTION_INCLUDE });
+  const updated = await prisma.taskException.update({ where: { id }, data, include: EXCEPTION_INCLUDE });
+  if (input.status === "RESOLVED" && exception.status !== "RESOLVED") {
+    domainEvents.emitTyped("task.exception_resolved", {
+      taskId: exception.taskId,
+      tenantId,
+      exceptionId: exception.id,
+    });
+  }
+  return updated;
 }

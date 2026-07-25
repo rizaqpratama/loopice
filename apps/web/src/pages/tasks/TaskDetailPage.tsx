@@ -188,13 +188,14 @@ export function TaskDetailPage() {
     setDialogError(null);
     setIsDialogSaving(true);
     try {
-      const updated = await tasksApi.updateTaskStatus(task.id, "RESCHEDULED", task.version, rescheduleReason);
-      if (rescheduleDate) {
-        await tasksApi.updateTask(task.id, {
-          scheduledDate: new Date(rescheduleDate).toISOString(),
-          expectedVersion: updated.version,
-        });
-      }
+      await tasksApi.rescheduleTask(
+        task.id,
+        {
+          reason: rescheduleReason,
+          scheduledDate: rescheduleDate ? new Date(rescheduleDate).toISOString() : undefined,
+        },
+        task.version
+      );
       await load();
       closeDialog();
     } catch (err) {

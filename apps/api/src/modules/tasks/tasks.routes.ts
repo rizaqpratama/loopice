@@ -29,6 +29,7 @@ tasksFlatRoutes.get("/:id", requireRole([...READ_ROLES]), asyncHandler(controlle
 tasksFlatRoutes.patch("/:id", requireRole([...WRITE_ROLES]), asyncHandler(controller.update));
 tasksFlatRoutes.patch("/:id/status", requireRole([...WRITE_ROLES, "DRIVER"]), asyncHandler(controller.updateStatus));
 tasksFlatRoutes.patch("/:id/cancel", requireRole([...WRITE_ROLES]), asyncHandler(controller.cancel));
+tasksFlatRoutes.patch("/:id/reschedule", requireRole([...WRITE_ROLES]), asyncHandler(controller.reschedule));
 tasksFlatRoutes.patch("/:id/assign", requireRole([...WRITE_ROLES]), asyncHandler(controller.assign));
 tasksFlatRoutes.patch("/:id/unassign", requireRole([...WRITE_ROLES]), asyncHandler(controller.unassign));
 tasksFlatRoutes.patch("/:id/complete", requireRole([...WRITE_ROLES, "DRIVER"]), asyncHandler(controller.complete));

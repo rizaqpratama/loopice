@@ -3,6 +3,7 @@ export {
   updateTaskSchema,
   updateTaskStatusSchema,
   cancelTaskSchema,
+  rescheduleTaskSchema,
   assignTaskSchema,
   unassignTaskSchema,
   bulkAssignSchema,

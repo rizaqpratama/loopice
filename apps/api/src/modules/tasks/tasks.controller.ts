@@ -15,6 +15,7 @@ import {
   createTaskSchema,
   failTaskSchema,
   partialCompleteTaskSchema,
+  rescheduleTaskSchema,
   unassignTaskSchema,
   updateTaskSchema,
   updateTaskStatusSchema,
@@ -138,6 +139,20 @@ export async function cancel(req: Request, res: Response) {
       tenantId(req),
       req.params.id,
       reason,
+      expectedVersion,
+      req.user?.userId ?? null,
+      clientRequestId
+    )
+  );
+}
+
+export async function reschedule(req: Request, res: Response) {
+  const { expectedVersion, clientRequestId, ...input } = rescheduleTaskSchema.parse(req.body);
+  res.json(
+    await tasksService.rescheduleTask(
+      tenantId(req),
+      req.params.id,
+      input,
       expectedVersion,
       req.user?.userId ?? null,
       clientRequestId

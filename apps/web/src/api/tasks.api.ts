@@ -234,6 +234,20 @@ export function cancelTask(id: string, reason: string, expectedVersion: number) 
   return apiRequest<Task>(`/tasks/${id}/cancel`, { method: "PATCH", body: { reason, expectedVersion } });
 }
 
+export interface RescheduleTaskInput {
+  scheduledDate?: string;
+  timeWindowStart?: string;
+  timeWindowEnd?: string;
+  reason: string;
+}
+
+export function rescheduleTask(id: string, input: RescheduleTaskInput, expectedVersion: number) {
+  return apiRequest<Task>(`/tasks/${id}/reschedule`, {
+    method: "PATCH",
+    body: { ...input, expectedVersion },
+  });
+}
+
 export function deleteTask(id: string) {
   return apiRequest<void>(`/tasks/${id}`, { method: "DELETE" });
 }

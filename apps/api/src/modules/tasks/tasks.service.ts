@@ -8,6 +8,7 @@ import {
 } from "@loopice/shared";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
+import { domainEvents } from "../../lib/domainEvents";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/httpError";
 import { SAFE_USER_SELECT } from "../../lib/safeUserSelect";
 
@@ -304,7 +305,7 @@ export async function createTask(
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
     const taskNumber = await generateTaskNumber(tenantId);
     try {
-      return await prisma.$transaction(async (tx) => {
+      const created = await prisma.$transaction(async (tx) => {
         const task = await tx.task.create({
           data: {
             tenantId,
@@ -344,6 +345,8 @@ export async function createTask(
         }
         return tx.task.findUniqueOrThrow({ where: { id: task.id }, include: TASK_INCLUDE });
       });
+      domainEvents.emitTyped("task.created", { taskId: created.id, tenantId, taskNumber: created.taskNumber });
+      return created;
     } catch (err) {
       const isUniqueClash =
         err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002";
@@ -464,8 +467,9 @@ export async function updateTaskStatus(
     throw new BadRequestError(`Cannot transition task from ${task.status} to ${status}`);
   }
   await assertDependenciesSatisfied(id, status);
+  const previousStatus = task.status;
 
-  return prisma.$transaction(async (tx) => {
+  const updated = await prisma.$transaction(async (tx) => {
     const result = await tx.task.updateMany({
       where: { id, version: expectedVersion },
       data: { status, version: { increment: 1 }, updatedById: changedById ?? undefined },
@@ -478,6 +482,8 @@ export async function updateTaskStatus(
     });
     return tx.task.findUniqueOrThrow({ where: { id }, include: TASK_INCLUDE });
   });
+  domainEvents.emitTyped("task.status_changed", { taskId: id, tenantId, from: previousStatus, to: status });
+  return updated;
 }
 
 export async function cancelTask(
@@ -496,7 +502,7 @@ export async function cancelTask(
     throw new BadRequestError(`Cannot cancel a task in ${task.status} status`);
   }
 
-  return prisma.$transaction(async (tx) => {
+  const cancelled = await prisma.$transaction(async (tx) => {
     const result = await tx.task.updateMany({
       where: { id, version: expectedVersion },
       data: { status: "CANCELLED", version: { increment: 1 }, updatedById: changedById ?? undefined },
@@ -515,6 +521,64 @@ export async function cancelTask(
     });
     return tx.task.findUniqueOrThrow({ where: { id }, include: TASK_INCLUDE });
   });
+  domainEvents.emitTyped("task.cancelled", { taskId: id, tenantId, reason });
+  return cancelled;
+}
+
+export interface RescheduleTaskInput {
+  scheduledDate?: string;
+  timeWindowStart?: string;
+  timeWindowEnd?: string;
+  reason: string;
+}
+
+export async function rescheduleTask(
+  tenantId: string,
+  id: string,
+  input: RescheduleTaskInput,
+  expectedVersion: number,
+  changedById: string | null,
+  clientRequestId?: string
+) {
+  const replay = await replayIfIdempotent(tenantId, id, clientRequestId);
+  if (replay) return replay;
+
+  const task = await findScoped(tenantId, id);
+  if (!canTransitionTaskStatusForType(task.taskType, task.status, "RESCHEDULED")) {
+    throw new BadRequestError(`Cannot reschedule a task in ${task.status} status`);
+  }
+
+  const rescheduled = await prisma.$transaction(async (tx) => {
+    const result = await tx.task.updateMany({
+      where: { id, version: expectedVersion },
+      data: {
+        status: "RESCHEDULED",
+        scheduledDate: input.scheduledDate ? new Date(input.scheduledDate) : undefined,
+        timeWindowStart: input.timeWindowStart ? new Date(input.timeWindowStart) : undefined,
+        timeWindowEnd: input.timeWindowEnd ? new Date(input.timeWindowEnd) : undefined,
+        version: { increment: 1 },
+        updatedById: changedById ?? undefined,
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictError(`Task was modified by someone else (expected version ${expectedVersion})`);
+    }
+    await tx.taskStatusHistory.create({
+      data: {
+        taskId: id,
+        status: "RESCHEDULED",
+        note: input.reason,
+        previousScheduledDate: task.scheduledDate,
+        previousTimeWindowStart: task.timeWindowStart,
+        previousTimeWindowEnd: task.timeWindowEnd,
+        changedById: changedById ?? undefined,
+        clientRequestId,
+      },
+    });
+    return tx.task.findUniqueOrThrow({ where: { id }, include: TASK_INCLUDE });
+  });
+  domainEvents.emitTyped("task.rescheduled", { taskId: id, tenantId, reason: input.reason });
+  return rescheduled;
 }
 
 export async function deleteTask(tenantId: string, id: string) {
@@ -692,7 +756,7 @@ export async function assignTask(
     await assertAvailability(tenantId, task, input.assignedDriverId, input.assignedVehicleId);
   }
 
-  return prisma.$transaction(async (tx) => {
+  const assigned = await prisma.$transaction(async (tx) => {
     const result = await tx.task.updateMany({
       where: { id, version: expectedVersion },
       data: {
@@ -724,6 +788,13 @@ export async function assignTask(
     });
     return tx.task.findUniqueOrThrow({ where: { id }, include: TASK_INCLUDE });
   });
+  domainEvents.emitTyped("task.assigned", {
+    taskId: id,
+    tenantId,
+    assignedDriverId: input.assignedDriverId,
+    assignedVehicleId: input.assignedVehicleId,
+  });
+  return assigned;
 }
 
 export async function unassignTask(
@@ -741,7 +812,7 @@ export async function unassignTask(
     throw new BadRequestError(`Cannot unassign a task in ${task.status} status`);
   }
 
-  return prisma.$transaction(async (tx) => {
+  const unassigned = await prisma.$transaction(async (tx) => {
     const result = await tx.task.updateMany({
       where: { id, version: expectedVersion },
       data: {
@@ -763,6 +834,8 @@ export async function unassignTask(
     });
     return tx.task.findUniqueOrThrow({ where: { id }, include: TASK_INCLUDE });
   });
+  domainEvents.emitTyped("task.unassigned", { taskId: id, tenantId });
+  return unassigned;
 }
 
 export interface BulkResult {
@@ -842,7 +915,7 @@ export async function completeTask(
   validateProofTypes(task.taskType, proof);
   await assertDependenciesSatisfied(id, "COMPLETED");
 
-  return prisma.$transaction(async (tx) => {
+  const completed = await prisma.$transaction(async (tx) => {
     const now = new Date();
     const result = await tx.task.updateMany({
       where: { id, version: expectedVersion },
@@ -875,6 +948,8 @@ export async function completeTask(
     }
     return tx.task.findUniqueOrThrow({ where: { id }, include: TASK_INCLUDE });
   });
+  domainEvents.emitTyped("task.completed", { taskId: id, tenantId });
+  return completed;
 }
 
 export async function partialCompleteTask(
@@ -899,7 +974,7 @@ export async function partialCompleteTask(
   validateProofTypes(task.taskType, proof);
   await assertDependenciesSatisfied(id, "PARTIALLY_COMPLETED");
 
-  return prisma.$transaction(async (tx) => {
+  const partiallyCompleted = await prisma.$transaction(async (tx) => {
     const now = new Date();
     const result = await tx.task.updateMany({
       where: { id, version: expectedVersion },
@@ -938,6 +1013,8 @@ export async function partialCompleteTask(
     }
     return tx.task.findUniqueOrThrow({ where: { id }, include: TASK_INCLUDE });
   });
+  domainEvents.emitTyped("task.partially_completed", { taskId: id, tenantId });
+  return partiallyCompleted;
 }
 
 export async function failTask(
@@ -957,7 +1034,7 @@ export async function failTask(
     throw new BadRequestError(`Cannot fail a task in ${task.status} status`);
   }
 
-  return prisma.$transaction(async (tx) => {
+  const failed = await prisma.$transaction(async (tx) => {
     const result = await tx.task.updateMany({
       where: { id, version: expectedVersion },
       data: { status: "FAILED", version: { increment: 1 }, updatedById: actorId ?? undefined },
@@ -980,6 +1057,8 @@ export async function failTask(
     });
     return tx.task.findUniqueOrThrow({ where: { id }, include: TASK_INCLUDE });
   });
+  domainEvents.emitTyped("task.failed", { taskId: id, tenantId, exceptionType });
+  return failed;
 }
 
 export async function addProof(tenantId: string, taskId: string, input: ProofEntryInput, actorId: string | null) {
@@ -1011,7 +1090,7 @@ export async function reportException(
   actorId: string | null
 ) {
   await findScoped(tenantId, taskId);
-  return prisma.taskException.create({
+  const exception = await prisma.taskException.create({
     data: {
       tenantId,
       taskId,
@@ -1022,6 +1101,13 @@ export async function reportException(
       reportedById: actorId ?? undefined,
     },
   });
+  domainEvents.emitTyped("task.exception_reported", {
+    taskId,
+    tenantId,
+    exceptionId: exception.id,
+    type: exception.type,
+  });
+  return exception;
 }
 
 // -- Dependency graph -------------------------------------------------------
