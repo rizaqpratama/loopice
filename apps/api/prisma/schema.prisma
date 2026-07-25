@@ -14,12 +14,28 @@ enum UserRole {
   // future: DRIVER (fleet driver portal access, phase 3+)
 }
 
-enum OrderStatus {
-  PENDING
+// A Service Order (SO) is the customer-facing request for logistics
+// services. It moves through this lifecycle once at a time; CANCELLED is
+// only reachable before work physically starts (DRAFT/QUOTED/CONFIRMED/
+// PLANNED) -- once IN_PROGRESS or later, the job is already happening.
+enum ServiceOrderStatus {
+  DRAFT
+  QUOTED
   CONFIRMED
-  IN_TRANSIT
-  DELIVERED
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  BILLED
+  CLOSED
   CANCELLED
+}
+
+// A physical unit of cargo within a Service Order -- what actually gets
+// loaded, moved, and tracked. One SO can contain many shipments.
+enum ShipmentType {
+  PALLET
+  CONTAINER
+  PARCEL
 }
 
 model Tenant {
@@ -33,9 +49,10 @@ model Tenant {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  users     User[]
-  customers Customer[]
-  orders    Order[]
+  users        User[]
+  customers    Customer[]
+  serviceOrders ServiceOrder[]
+  shipments    Shipment[]
 
   @@index([isActive])
 }
@@ -54,8 +71,8 @@ model User {
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
-  ordersCreated       Order[]               @relation("OrderCreatedBy")
-  orderStatusChanges  OrderStatusHistory[]  @relation("OrderStatusChangedBy")
+  serviceOrdersCreated      ServiceOrder[]              @relation("ServiceOrderCreatedBy")
+  serviceOrderStatusChanges ServiceOrderStatusHistory[] @relation("ServiceOrderStatusChangedBy")
 
   // Composite unique keeps email unique per tenant. Note: Postgres treats each
   // NULL tenantId as distinct, so this alone does not guarantee globally-unique
@@ -77,56 +94,80 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders Order[]
+  serviceOrders ServiceOrder[]
 
   @@index([tenantId])
   @@index([tenantId, name])
 }
 
-model Order {
-  id            String      @id @default(cuid())
+model ServiceOrder {
+  id            String             @id @default(cuid())
   tenantId      String
-  tenant        Tenant      @relation(fields: [tenantId], references: [id])
-  orderNumber   String
+  tenant        Tenant             @relation(fields: [tenantId], references: [id])
+  soNumber      String
   customerId    String
-  customer      Customer    @relation(fields: [customerId], references: [id])
+  customer      Customer           @relation(fields: [customerId], references: [id])
   description   String?
-  status        OrderStatus @default(PENDING)
+  status        ServiceOrderStatus @default(DRAFT)
   createdById   String?
-  createdBy     User?       @relation("OrderCreatedBy", fields: [createdById], references: [id])
+  createdBy     User?              @relation("ServiceOrderCreatedBy", fields: [createdById], references: [id])
   originAddress String?
   destAddress   String?
   scheduledAt   DateTime?
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
-  statusHistory OrderStatusHistory[]
-  // future (phase 2): shipments Shipment[] -- inter-city/multi-leg shipment linkage
+  statusHistory ServiceOrderStatusHistory[]
+  shipments     Shipment[]
+  // future (phase 2): station-to-station routing/legs per shipment
 
-  @@unique([tenantId, orderNumber])
+  @@unique([tenantId, soNumber])
   @@index([tenantId, status])
   @@index([tenantId, customerId])
 }
 
-model OrderStatusHistory {
-  id          String      @id @default(cuid())
-  orderId     String
-  order       Order       @relation(fields: [orderId], references: [id])
-  status      OrderStatus
-  note        String?
-  changedById String?
-  changedBy   User?       @relation("OrderStatusChangedBy", fields: [changedById], references: [id])
-  changedAt   DateTime    @default(now())
+model ServiceOrderStatusHistory {
+  id             String             @id @default(cuid())
+  serviceOrderId String
+  serviceOrder   ServiceOrder       @relation(fields: [serviceOrderId], references: [id])
+  status         ServiceOrderStatus
+  note           String?
+  changedById    String?
+  changedBy      User?              @relation("ServiceOrderStatusChangedBy", fields: [changedById], references: [id])
+  changedAt      DateTime           @default(now())
 
-  @@index([orderId])
+  @@index([serviceOrderId])
 }
 
-// -- FUTURE (phase 2): inter-city / inter-station shipment routing
+// A pallet, container, or parcel within a Service Order -- the actual
+// cargo units that get loaded and moved. No independent status yet in
+// this pass; tracking lives at the Service Order level.
+model Shipment {
+  id             String       @id @default(cuid())
+  tenantId       String
+  tenant         Tenant       @relation(fields: [tenantId], references: [id])
+  serviceOrderId String
+  serviceOrder   ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  type           ShipmentType
+  quantity       Int          @default(1)
+  weightKg       Float?
+  lengthCm       Float?
+  widthCm        Float?
+  heightCm       Float?
+  description    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([tenantId])
+  @@index([serviceOrderId])
+}
+
+// -- FUTURE (phase 2): inter-city / inter-station routing for shipments
 // model Station {
 //   id, tenantId, name, city, address, ...
 // }
-// model Shipment {
-//   id, tenantId, orderId, originStationId, destStationId,
+// model ShipmentLeg {
+//   id, tenantId, shipmentId, originStationId, destStationId,
 //   status, legSequence, vehicleId, driverId, ...
 // }
 

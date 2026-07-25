@@ -88,43 +88,77 @@ async function main() {
     customers.push(await findOrCreateCustomer(tenant.id, seed));
   }
 
-  const existingOrders = await prisma.order.count({ where: { tenantId: tenant.id } });
-  if (existingOrders === 0) {
-    const finalStatuses = ["PENDING", "CONFIRMED", "IN_TRANSIT", "DELIVERED", "CANCELLED"] as const;
+  const existingServiceOrders = await prisma.serviceOrder.count({ where: { tenantId: tenant.id } });
+  if (existingServiceOrders === 0) {
+    const finalStatuses = [
+      "DRAFT",
+      "QUOTED",
+      "CONFIRMED",
+      "PLANNED",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "BILLED",
+      "CLOSED",
+      "CANCELLED",
+    ] as const;
+
+    // Steps taken *after* the initial DRAFT creation to reach each final
+    // status -- mirrors the real lifecycle rather than jumping straight there.
     const lifecycleSteps: Record<(typeof finalStatuses)[number], (typeof finalStatuses)[number][]> = {
-      PENDING: [],
-      CONFIRMED: ["CONFIRMED"],
-      IN_TRANSIT: ["CONFIRMED", "IN_TRANSIT"],
-      DELIVERED: ["CONFIRMED", "IN_TRANSIT", "DELIVERED"],
-      CANCELLED: ["CANCELLED"],
+      DRAFT: [],
+      QUOTED: ["QUOTED"],
+      CONFIRMED: ["QUOTED", "CONFIRMED"],
+      PLANNED: ["QUOTED", "CONFIRMED", "PLANNED"],
+      IN_PROGRESS: ["QUOTED", "CONFIRMED", "PLANNED", "IN_PROGRESS"],
+      COMPLETED: ["QUOTED", "CONFIRMED", "PLANNED", "IN_PROGRESS", "COMPLETED"],
+      BILLED: ["QUOTED", "CONFIRMED", "PLANNED", "IN_PROGRESS", "COMPLETED", "BILLED"],
+      CLOSED: ["QUOTED", "CONFIRMED", "PLANNED", "IN_PROGRESS", "COMPLETED", "BILLED", "CLOSED"],
+      CANCELLED: ["QUOTED", "CANCELLED"],
     };
 
-    for (let i = 0; i < 8; i++) {
-      const customer = customers[i % customers.length];
-      const finalStatus = finalStatuses[i % finalStatuses.length];
-      const orderNumber = `ORD-${String(i + 1).padStart(6, "0")}`;
+    const shipmentTemplates = [
+      { type: "PALLET" as const, quantity: 4, weightKg: 320, lengthCm: 120, widthCm: 100, heightCm: 150, description: "Dry goods, shrink-wrapped" },
+      { type: "CONTAINER" as const, quantity: 1, weightKg: 4200, lengthCm: 600, widthCm: 244, heightCm: 259, description: "20ft container, general cargo" },
+      { type: "PARCEL" as const, quantity: 12, weightKg: 45, lengthCm: 40, widthCm: 30, heightCm: 30, description: "Retail parcels" },
+    ];
 
-      const order = await prisma.order.create({
+    for (let i = 0; i < finalStatuses.length; i++) {
+      const customer = customers[i % customers.length];
+      const finalStatus = finalStatuses[i];
+      const soNumber = `SO-${String(i + 1).padStart(6, "0")}`;
+
+      const serviceOrder = await prisma.serviceOrder.create({
         data: {
           tenantId: tenant.id,
-          orderNumber,
+          soNumber,
           customerId: customer.id,
-          description: `Shipment of goods for order ${orderNumber}`,
+          description: `Freight movement for ${soNumber}`,
           originAddress: "Warehouse Jakarta",
           destAddress: customer.address ?? "Customer address",
-          status: "PENDING",
+          status: "DRAFT",
           createdById: dispatcher.id,
         },
       });
 
-      await prisma.orderStatusHistory.create({
-        data: { orderId: order.id, status: "PENDING", changedById: dispatcher.id },
+      await prisma.serviceOrderStatusHistory.create({
+        data: { serviceOrderId: serviceOrder.id, status: "DRAFT", changedById: dispatcher.id },
       });
 
       for (const step of lifecycleSteps[finalStatus]) {
-        await prisma.order.update({ where: { id: order.id }, data: { status: step } });
-        await prisma.orderStatusHistory.create({
-          data: { orderId: order.id, status: step, changedById: admin.id },
+        await prisma.serviceOrder.update({ where: { id: serviceOrder.id }, data: { status: step } });
+        await prisma.serviceOrderStatusHistory.create({
+          data: { serviceOrderId: serviceOrder.id, status: step, changedById: admin.id },
+        });
+      }
+
+      const template = shipmentTemplates[i % shipmentTemplates.length];
+      await prisma.shipment.create({
+        data: { tenantId: tenant.id, serviceOrderId: serviceOrder.id, ...template },
+      });
+      if (i % 2 === 0) {
+        const secondTemplate = shipmentTemplates[(i + 1) % shipmentTemplates.length];
+        await prisma.shipment.create({
+          data: { tenantId: tenant.id, serviceOrderId: serviceOrder.id, ...secondTemplate },
         });
       }
     }

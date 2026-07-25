@@ -2,14 +2,14 @@ import * as React from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Mail, MapPin, Phone } from "lucide-react";
 import * as customersApi from "@/api/customers.api";
-import type { CustomerWithOrders } from "@/api/customers.api";
+import type { CustomerWithServiceOrders } from "@/api/customers.api";
 import { Avatar } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { StatusStamp } from "@/pages/orders/statusBadge";
+import { StatusStamp } from "@/pages/serviceOrders/statusBadge";
 
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [customer, setCustomer] = React.useState<CustomerWithOrders | null>(null);
+  const [customer, setCustomer] = React.useState<CustomerWithServiceOrders | null>(null);
 
   React.useEffect(() => {
     if (id) customersApi.getCustomer(id).then(setCustomer);
@@ -65,26 +65,28 @@ export function CustomerDetailPage() {
       <Card>
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Orders
+            Service Orders
           </p>
           <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            {customer.orders.length} total
+            {customer.serviceOrders.length} total
           </p>
         </div>
-        {customer.orders.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-muted-foreground">No orders yet.</p>
+        {customer.serviceOrders.length === 0 ? (
+          <p className="px-5 py-8 text-center text-sm text-muted-foreground">
+            No service orders yet.
+          </p>
         ) : (
           <div className="divide-y divide-border">
-            {customer.orders.map((order) => (
+            {customer.serviceOrders.map((so) => (
               <Link
-                key={order.id}
-                to={`/orders/${order.id}`}
+                key={so.id}
+                to={`/service-orders/${so.id}`}
                 className="flex items-center justify-between px-5 py-3 transition-colors hover:bg-muted"
               >
                 <span className="font-mono text-sm font-medium text-foreground">
-                  {order.orderNumber}
+                  {so.soNumber}
                 </span>
-                <StatusStamp status={order.status} />
+                <StatusStamp status={so.status} />
               </Link>
             ))}
           </div>

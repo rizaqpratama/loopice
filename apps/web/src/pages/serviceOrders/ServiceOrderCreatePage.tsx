@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin } from "lucide-react";
 import * as customersApi from "@/api/customers.api";
 import type { Customer } from "@/api/customers.api";
-import * as ordersApi from "@/api/orders.api";
+import * as serviceOrdersApi from "@/api/serviceOrders.api";
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function OrderCreatePage() {
+export function ServiceOrderCreatePage() {
   const navigate = useNavigate();
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [customerId, setCustomerId] = React.useState("");
@@ -30,15 +30,15 @@ export function OrderCreatePage() {
     setError(null);
     setIsSubmitting(true);
     try {
-      const order = await ordersApi.createOrder({
+      const serviceOrder = await serviceOrdersApi.createServiceOrder({
         customerId,
         description: description || undefined,
         originAddress: originAddress || undefined,
         destAddress: destAddress || undefined,
       });
-      navigate(`/orders/${order.id}`, { replace: true });
+      navigate(`/service-orders/${serviceOrder.id}`, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create order");
+      setError(err instanceof ApiError ? err.message : "Failed to create service order");
     } finally {
       setIsSubmitting(false);
     }
@@ -48,23 +48,23 @@ export function OrderCreatePage() {
     <div className="flex max-w-lg flex-col gap-6">
       <div>
         <Link
-          to="/orders"
+          to="/service-orders"
           className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-          Orders
+          Service Orders
         </Link>
         <p className="mt-2 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-          New waybill
+          New service order
         </p>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
-          Create order
+          Create service order
         </h1>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Customer &amp; cargo</CardTitle>
+          <CardTitle>Customer &amp; route</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
@@ -93,7 +93,7 @@ export function OrderCreatePage() {
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Cargo / item description"
+                placeholder="Job notes -- shipments (pallets/containers/parcels) are added after creation"
               />
             </div>
 
@@ -132,7 +132,7 @@ export function OrderCreatePage() {
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             <Button type="submit" disabled={isSubmitting || !customerId}>
-              {isSubmitting ? "Creating…" : "Create order"}
+              {isSubmitting ? "Creating…" : "Create service order"}
             </Button>
           </form>
         </CardContent>

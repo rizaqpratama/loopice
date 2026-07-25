@@ -1,25 +1,25 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
-import { Package, Plus } from "lucide-react";
-import type { OrderStatus } from "@loopice/shared";
-import { ORDER_STATUSES } from "@loopice/shared";
-import * as ordersApi from "@/api/orders.api";
-import type { Order } from "@/api/orders.api";
+import { ClipboardList, Plus } from "lucide-react";
+import type { ServiceOrderStatus } from "@loopice/shared";
+import { SERVICE_ORDER_STATUSES } from "@loopice/shared";
+import * as serviceOrdersApi from "@/api/serviceOrders.api";
+import type { ServiceOrder } from "@/api/serviceOrders.api";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { STATUS_INK, StatusStamp } from "./statusBadge";
 
-export function OrdersListPage() {
-  const [orders, setOrders] = React.useState<Order[]>([]);
-  const [status, setStatus] = React.useState<OrderStatus | "">("");
+export function ServiceOrdersListPage() {
+  const [serviceOrders, setServiceOrders] = React.useState<ServiceOrder[]>([]);
+  const [status, setStatus] = React.useState<ServiceOrderStatus | "">("");
   const [isLoading, setIsLoading] = React.useState(true);
 
-  const load = React.useCallback(async (status?: OrderStatus) => {
+  const load = React.useCallback(async (status?: ServiceOrderStatus) => {
     setIsLoading(true);
-    const res = await ordersApi.listOrders({ status, limit: 50 });
-    setOrders(res.items);
+    const res = await serviceOrdersApi.listServiceOrders({ status, limit: 50 });
+    setServiceOrders(res.items);
     setIsLoading(false);
   }, []);
 
@@ -32,16 +32,16 @@ export function OrdersListPage() {
       <div className="flex items-end justify-between">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Order ledger
+            Service order ledger
           </p>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
-            Orders
+            Service Orders
           </h1>
         </div>
-        <Link to="/orders/new">
+        <Link to="/service-orders/new">
           <Button>
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            New order
+            New service order
           </Button>
         </Link>
       </div>
@@ -58,7 +58,7 @@ export function OrdersListPage() {
         >
           All
         </button>
-        {ORDER_STATUSES.map((s) => (
+        {SERVICE_ORDER_STATUSES.map((s) => (
           <button
             key={s}
             onClick={() => setStatus(s)}
@@ -76,8 +76,9 @@ export function OrdersListPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Order #</TableHead>
+              <TableHead>SO #</TableHead>
               <TableHead>Customer</TableHead>
+              <TableHead>Shipments</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Created</TableHead>
             </TableRow>
@@ -85,37 +86,40 @@ export function OrdersListPage() {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                <TableCell colSpan={5} className="text-center text-muted-foreground">
                   Loading…
                 </TableCell>
               </TableRow>
             )}
-            {!isLoading && orders.length === 0 && (
+            {!isLoading && serviceOrders.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4}>
+                <TableCell colSpan={5}>
                   <div className="flex flex-col items-center gap-2 py-10 text-center">
-                    <Package className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
-                    <p className="text-sm text-muted-foreground">No orders found.</p>
+                    <ClipboardList className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
+                    <p className="text-sm text-muted-foreground">No service orders found.</p>
                   </div>
                 </TableCell>
               </TableRow>
             )}
-            {orders.map((order) => (
-              <TableRow key={order.id}>
+            {serviceOrders.map((so) => (
+              <TableRow key={so.id}>
                 <TableCell>
                   <Link
-                    to={`/orders/${order.id}`}
+                    to={`/service-orders/${so.id}`}
                     className="font-mono text-sm font-medium text-foreground hover:text-brand-primary"
                   >
-                    {order.orderNumber}
+                    {so.soNumber}
                   </Link>
                 </TableCell>
-                <TableCell>{order.customer.name}</TableCell>
+                <TableCell>{so.customer.name}</TableCell>
+                <TableCell className="text-muted-foreground">
+                  {so.shipments.length} {so.shipments.length === 1 ? "unit" : "units"}
+                </TableCell>
                 <TableCell>
-                  <StatusStamp status={order.status} ringOffset="ring-offset-card" />
+                  <StatusStamp status={so.status} ringOffset="ring-offset-card" />
                 </TableCell>
                 <TableCell className="text-muted-foreground">
-                  {new Date(order.createdAt).toLocaleDateString()}
+                  {new Date(so.createdAt).toLocaleDateString()}
                 </TableCell>
               </TableRow>
             ))}

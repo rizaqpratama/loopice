@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { ORDER_STATUSES } from "./orderStatus";
+import { SERVICE_ORDER_STATUSES } from "./serviceOrderStatus";
+import { SHIPMENT_TYPES } from "./shipmentType";
 import { USER_ROLES } from "./roles";
 
 export const loginSchema = z.object({
@@ -61,7 +62,7 @@ export const createCustomerSchema = z.object({
 
 export const updateCustomerSchema = createCustomerSchema.partial();
 
-export const createOrderSchema = z.object({
+export const createServiceOrderSchema = z.object({
   customerId: z.string().min(1),
   description: z.string().optional(),
   originAddress: z.string().optional(),
@@ -69,14 +70,26 @@ export const createOrderSchema = z.object({
   scheduledAt: z.string().datetime().optional(),
 });
 
-export const updateOrderSchema = z.object({
+export const updateServiceOrderSchema = z.object({
   description: z.string().optional(),
   originAddress: z.string().optional(),
   destAddress: z.string().optional(),
   scheduledAt: z.string().datetime().nullable().optional(),
 });
 
-export const updateOrderStatusSchema = z.object({
-  status: z.enum(ORDER_STATUSES),
+export const updateServiceOrderStatusSchema = z.object({
+  status: z.enum(SERVICE_ORDER_STATUSES),
   note: z.string().optional(),
 });
+
+export const createShipmentSchema = z.object({
+  type: z.enum(SHIPMENT_TYPES),
+  quantity: z.number().int().min(1).default(1),
+  weightKg: z.number().positive().optional(),
+  lengthCm: z.number().positive().optional(),
+  widthCm: z.number().positive().optional(),
+  heightCm: z.number().positive().optional(),
+  description: z.string().optional(),
+});
+
+export const updateShipmentSchema = createShipmentSchema.partial();

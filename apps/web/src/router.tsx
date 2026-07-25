@@ -6,9 +6,9 @@ import { LoginPage } from "@/pages/LoginPage";
 import { DashboardPage } from "@/pages/DashboardPage";
 import { CustomersListPage } from "@/pages/customers/CustomersListPage";
 import { CustomerDetailPage } from "@/pages/customers/CustomerDetailPage";
-import { OrdersListPage } from "@/pages/orders/OrdersListPage";
-import { OrderCreatePage } from "@/pages/orders/OrderCreatePage";
-import { OrderDetailPage } from "@/pages/orders/OrderDetailPage";
+import { ServiceOrdersListPage } from "@/pages/serviceOrders/ServiceOrdersListPage";
+import { ServiceOrderCreatePage } from "@/pages/serviceOrders/ServiceOrderCreatePage";
+import { ServiceOrderDetailPage } from "@/pages/serviceOrders/ServiceOrderDetailPage";
 import { TenantBrandingSettingsPage } from "@/pages/settings/TenantBrandingSettingsPage";
 import { UserManagementPage } from "@/pages/settings/UserManagementPage";
 
@@ -28,9 +28,9 @@ export function AppRouter() {
       <Route path="/" element={<Shell><DashboardPage /></Shell>} />
       <Route path="/customers" element={<Shell><CustomersListPage /></Shell>} />
       <Route path="/customers/:id" element={<Shell><CustomerDetailPage /></Shell>} />
-      <Route path="/orders" element={<Shell><OrdersListPage /></Shell>} />
-      <Route path="/orders/new" element={<Shell><OrderCreatePage /></Shell>} />
-      <Route path="/orders/:id" element={<Shell><OrderDetailPage /></Shell>} />
+      <Route path="/service-orders" element={<Shell><ServiceOrdersListPage /></Shell>} />
+      <Route path="/service-orders/new" element={<Shell><ServiceOrderCreatePage /></Shell>} />
+      <Route path="/service-orders/:id" element={<Shell><ServiceOrderDetailPage /></Shell>} />
       <Route
         path="/settings/branding"
         element={

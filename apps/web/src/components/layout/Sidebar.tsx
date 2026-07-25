@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 const navItems = [
   { to: "/", label: "Dashboard", end: true, icon: LayoutDashboard },
   { to: "/customers", label: "Customers", icon: Users },
-  { to: "/orders", label: "Orders", icon: Package },
+  { to: "/service-orders", label: "Service Orders", icon: Package },
 ];
 
 const settingsItems = [

@@ -1,33 +1,34 @@
-import { canTransitionOrderStatus, type OrderStatus } from "@loopice/shared";
+import { canTransitionServiceOrderStatus, type ServiceOrderStatus } from "@loopice/shared";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { BadRequestError, NotFoundError } from "../../lib/httpError";
 
-const ORDER_INCLUDE = {
+const SERVICE_ORDER_INCLUDE = {
   customer: true,
+  shipments: true,
   statusHistory: { orderBy: { changedAt: "asc" as const } },
-} satisfies Prisma.OrderInclude;
+} satisfies Prisma.ServiceOrderInclude;
 
-export interface ListOrdersParams {
-  status?: OrderStatus;
+export interface ListServiceOrdersParams {
+  status?: ServiceOrderStatus;
   customerId?: string;
   search?: string;
   page?: number;
   limit?: number;
 }
 
-export async function listOrders(tenantId: string, params: ListOrdersParams) {
+export async function listServiceOrders(tenantId: string, params: ListServiceOrdersParams) {
   const page = params.page && params.page > 0 ? params.page : 1;
   const limit = params.limit && params.limit > 0 ? Math.min(params.limit, 100) : 20;
 
-  const where: Prisma.OrderWhereInput = {
+  const where: Prisma.ServiceOrderWhereInput = {
     tenantId,
     ...(params.status ? { status: params.status } : {}),
     ...(params.customerId ? { customerId: params.customerId } : {}),
     ...(params.search
       ? {
           OR: [
-            { orderNumber: { contains: params.search, mode: "insensitive" } },
+            { soNumber: { contains: params.search, mode: "insensitive" } },
             { description: { contains: params.search, mode: "insensitive" } },
           ],
         }
@@ -35,20 +36,20 @@ export async function listOrders(tenantId: string, params: ListOrdersParams) {
   };
 
   const [items, total] = await Promise.all([
-    prisma.order.findMany({
+    prisma.serviceOrder.findMany({
       where,
-      include: ORDER_INCLUDE,
+      include: SERVICE_ORDER_INCLUDE,
       orderBy: { createdAt: "desc" },
       skip: (page - 1) * limit,
       take: limit,
     }),
-    prisma.order.count({ where }),
+    prisma.serviceOrder.count({ where }),
   ]);
 
   return { items, total, page, limit };
 }
 
-export interface CreateOrderInput {
+export interface CreateServiceOrderInput {
   customerId: string;
   description?: string;
   originAddress?: string;
@@ -61,46 +62,49 @@ async function assertCustomerInTenant(tenantId: string, customerId: string) {
   if (!customer) throw new BadRequestError("Customer does not belong to this tenant");
 }
 
-async function generateOrderNumber(tenantId: string): Promise<string> {
-  const count = await prisma.order.count({ where: { tenantId } });
-  return `ORD-${String(count + 1).padStart(6, "0")}`;
+async function generateSoNumber(tenantId: string): Promise<string> {
+  const count = await prisma.serviceOrder.count({ where: { tenantId } });
+  return `SO-${String(count + 1).padStart(6, "0")}`;
 }
 
-export async function createOrder(
+export async function createServiceOrder(
   tenantId: string,
   createdById: string | null,
-  input: CreateOrderInput
+  input: CreateServiceOrderInput
 ) {
   await assertCustomerInTenant(tenantId, input.customerId);
 
   const MAX_ATTEMPTS = 5;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-    const orderNumber = await generateOrderNumber(tenantId);
+    const soNumber = await generateSoNumber(tenantId);
     try {
       return await prisma.$transaction(async (tx) => {
-        const order = await tx.order.create({
+        const serviceOrder = await tx.serviceOrder.create({
           data: {
             tenantId,
-            orderNumber,
+            soNumber,
             customerId: input.customerId,
             description: input.description,
             originAddress: input.originAddress,
             destAddress: input.destAddress,
             scheduledAt: input.scheduledAt ? new Date(input.scheduledAt) : undefined,
             createdById: createdById ?? undefined,
-            status: "PENDING",
+            status: "DRAFT",
           },
         });
-        await tx.orderStatusHistory.create({
+        await tx.serviceOrderStatusHistory.create({
           data: {
-            orderId: order.id,
-            status: "PENDING",
+            serviceOrderId: serviceOrder.id,
+            status: "DRAFT",
             changedById: createdById ?? undefined,
           },
         });
         // Re-fetch with the include so the just-created status history row
-        // (inserted after `order` above) is present in the response.
-        return tx.order.findUniqueOrThrow({ where: { id: order.id }, include: ORDER_INCLUDE });
+        // (inserted after `serviceOrder` above) is present in the response.
+        return tx.serviceOrder.findUniqueOrThrow({
+          where: { id: serviceOrder.id },
+          include: SERVICE_ORDER_INCLUDE,
+        });
       });
     } catch (err) {
       const isUniqueClash =
@@ -108,32 +112,36 @@ export async function createOrder(
       if (!isUniqueClash || attempt === MAX_ATTEMPTS - 1) throw err;
     }
   }
-  throw new Error("Failed to generate a unique order number");
+  throw new Error("Failed to generate a unique SO number");
 }
 
 async function findScoped(tenantId: string, id: string) {
-  const order = await prisma.order.findFirst({
+  const serviceOrder = await prisma.serviceOrder.findFirst({
     where: { id, tenantId },
-    include: ORDER_INCLUDE,
+    include: SERVICE_ORDER_INCLUDE,
   });
-  if (!order) throw new NotFoundError("Order not found");
-  return order;
+  if (!serviceOrder) throw new NotFoundError("Service order not found");
+  return serviceOrder;
 }
 
-export async function getOrder(tenantId: string, id: string) {
+export async function getServiceOrder(tenantId: string, id: string) {
   return findScoped(tenantId, id);
 }
 
-export interface UpdateOrderInput {
+export interface UpdateServiceOrderInput {
   description?: string;
   originAddress?: string;
   destAddress?: string;
   scheduledAt?: string | null;
 }
 
-export async function updateOrder(tenantId: string, id: string, input: UpdateOrderInput) {
+export async function updateServiceOrder(
+  tenantId: string,
+  id: string,
+  input: UpdateServiceOrderInput
+) {
   await findScoped(tenantId, id);
-  return prisma.order.update({
+  return prisma.serviceOrder.update({
     where: { id },
     data: {
       description: input.description,
@@ -146,29 +154,34 @@ export async function updateOrder(tenantId: string, id: string, input: UpdateOrd
             ? null
             : new Date(input.scheduledAt),
     },
-    include: ORDER_INCLUDE,
+    include: SERVICE_ORDER_INCLUDE,
   });
 }
 
-export async function updateOrderStatus(
+export async function updateServiceOrderStatus(
   tenantId: string,
   id: string,
-  status: OrderStatus,
+  status: ServiceOrderStatus,
   note: string | undefined,
   changedById: string | null
 ) {
-  const order = await findScoped(tenantId, id);
+  const serviceOrder = await findScoped(tenantId, id);
 
-  if (order.status !== status && !canTransitionOrderStatus(order.status, status)) {
-    throw new BadRequestError(`Cannot transition order from ${order.status} to ${status}`);
+  if (
+    serviceOrder.status !== status &&
+    !canTransitionServiceOrderStatus(serviceOrder.status, status)
+  ) {
+    throw new BadRequestError(
+      `Cannot transition service order from ${serviceOrder.status} to ${status}`
+    );
   }
 
   return prisma.$transaction(async (tx) => {
-    await tx.order.update({ where: { id }, data: { status } });
-    await tx.orderStatusHistory.create({
-      data: { orderId: id, status, note, changedById: changedById ?? undefined },
+    await tx.serviceOrder.update({ where: { id }, data: { status } });
+    await tx.serviceOrderStatusHistory.create({
+      data: { serviceOrderId: id, status, note, changedById: changedById ?? undefined },
     });
     // Re-fetch with the include so the just-created status history row is present.
-    return tx.order.findUniqueOrThrow({ where: { id }, include: ORDER_INCLUDE });
+    return tx.serviceOrder.findUniqueOrThrow({ where: { id }, include: SERVICE_ORDER_INCLUDE });
   });
 }
