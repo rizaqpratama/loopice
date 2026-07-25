@@ -10,8 +10,13 @@ generator client {
 enum UserRole {
   SUPERADMIN // platform-level, not tied to a tenant (tenantId is null)
   TENANT_ADMIN
+  OPERATIONS_MANAGER
   DISPATCHER
-  // future: DRIVER (fleet driver portal access, phase 3+)
+  DRIVER
+  WAREHOUSE_STAFF
+  CUSTOMER_SERVICE
+  FINANCE
+  READ_ONLY
 }
 
 // A Service Order (SO) is the customer-facing request for logistics
@@ -38,6 +43,132 @@ enum ShipmentType {
   PARCEL
 }
 
+// Task lifecycle. A task moves forward through planning/execution; COMPLETED
+// and CANCELLED are terminal and immutable. PARTIALLY_COMPLETED is also
+// terminal -- corrective work becomes a *new* task (see TaskException.
+// followUpTaskId) rather than reopening this one.
+enum TaskStatus {
+  DRAFT
+  UNASSIGNED
+  ASSIGNED
+  PLANNED
+  READY
+  EN_ROUTE
+  ARRIVED
+  IN_PROGRESS
+  PARTIALLY_COMPLETED
+  COMPLETED
+  FAILED
+  RESCHEDULED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum TaskLocationType {
+  FACILITY
+  CUSTOMER_ADDRESS
+  PARTNER_ADDRESS
+  CUSTOM
+}
+
+enum AssigneeType {
+  DRIVER
+  VEHICLE
+  STAFF
+  TEAM
+  PARTNER
+}
+
+enum LocationRequirement {
+  NONE
+  FACILITY_ONLY
+  CUSTOMER_ADDRESS_ONLY
+  ANY
+}
+
+enum CargoRequirement {
+  NONE
+  OPTIONAL
+  REQUIRED
+}
+
+enum ProofType {
+  PHOTO
+  SIGNATURE
+  RECIPIENT_NAME
+  GPS_LOCATION
+  TIMESTAMP
+  QUANTITY_CONFIRMATION
+  CONDITION_CONFIRMATION
+  NOTE
+  DOCUMENT_ATTACHMENT
+  BARCODE_SCAN
+}
+
+enum ExceptionType {
+  CUSTOMER_UNAVAILABLE
+  ADDRESS_NOT_FOUND
+  ACCESS_RESTRICTED
+  CARGO_DAMAGED
+  CARGO_MISSING
+  PARTIAL_QUANTITY
+  VEHICLE_BREAKDOWN
+  DRIVER_UNAVAILABLE
+  FACILITY_CLOSED
+  DELIVERY_REJECTED
+  CAPACITY_EXCEEDED
+  INCORRECT_CARGO
+  MISSORT
+  OTHER
+}
+
+enum ExceptionSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ExceptionStatus {
+  OPEN
+  ASSIGNED
+  RESOLVED
+  CLOSED
+}
+
+// Absence of a TaskDependency row between two tasks *is* "no dependency" --
+// there is no NO_DEPENDENCY value stored.
+enum DependencyType {
+  FINISH_TO_START
+  START_TO_START
+  MANUAL_RELEASE
+}
+
+enum DriverStatus {
+  ACTIVE
+  ON_LEAVE
+  INACTIVE
+}
+
+enum VehicleStatus {
+  ACTIVE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum TripStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 model Tenant {
   id             String   @id @default(cuid())
   name           String
@@ -55,6 +186,18 @@ model Tenant {
   shipments     Shipment[]
   stations      Station[]
   shipmentLegs  ShipmentLeg[]
+
+  drivers          Driver[]
+  vehicles         Vehicle[]
+  teams            Team[]
+  partners         Partner[]
+  routes           Route[]
+  routeStops       RouteStop[]
+  trips            Trip[]
+  taskTypeConfigs  TaskTypeConfig[]
+  tasks            Task[]
+  taskExceptions   TaskException[]
+  taskDependencies TaskDependency[]
 
   @@index([isActive])
 }
@@ -77,6 +220,19 @@ model User {
   serviceOrderStatusChanges ServiceOrderStatusHistory[] @relation("ServiceOrderStatusChangedBy")
   shipmentLegStatusChanges  ShipmentLegStatusHistory[]  @relation("ShipmentLegStatusChangedBy")
 
+  driverProfiles     Driver[]
+  teamsLed           Team[]                  @relation("TeamLeader")
+  teamMemberships    TeamMember[]
+  assignedStaffTasks Task[]                  @relation("TaskAssignedStaff")
+  createdTasks       Task[]                  @relation("TaskCreatedBy")
+  updatedTasks       Task[]                  @relation("TaskUpdatedBy")
+  taskStatusChanges  TaskStatusHistory[]     @relation("TaskStatusChangedBy")
+  capturedProofs     TaskProofOfCompletion[] @relation("TaskProofCapturedBy")
+  exceptionsReported TaskException[]         @relation("ExceptionReportedBy")
+  exceptionsAssigned TaskException[]         @relation("ExceptionAssignedTo")
+  exceptionsResolved TaskException[]         @relation("ExceptionResolvedBy")
+  exceptionsClosed   TaskException[]         @relation("ExceptionClosedBy")
+
   // Composite unique keeps email unique per tenant. Note: Postgres treats each
   // NULL tenantId as distinct, so this alone does not guarantee globally-unique
   // emails across SUPERADMIN (tenantId = null) rows -- a follow-up partial
@@ -98,6 +254,7 @@ model Customer {
   updatedAt DateTime @updatedAt
 
   serviceOrders ServiceOrder[]
+  tasks         Task[]
 
   @@index([tenantId])
   @@index([tenantId, name])
@@ -123,6 +280,7 @@ model ServiceOrder {
   statusHistory ServiceOrderStatusHistory[]
   shipments     Shipment[]
   shipmentLegs  ShipmentLeg[]
+  tasks         Task[]
 
   @@unique([tenantId, soNumber])
   @@index([tenantId, status])
@@ -161,6 +319,8 @@ model Shipment {
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
+  taskLinks TaskShipment[]
+
   @@index([tenantId])
   @@index([serviceOrderId])
 }
@@ -190,6 +350,11 @@ model Station {
 
   originLegs ShipmentLeg[] @relation("ShipmentLegOrigin")
   destLegs   ShipmentLeg[] @relation("ShipmentLegDest")
+
+  drivers    Driver[]
+  vehicles   Vehicle[]
+  routeStops RouteStop[]
+  tasks      Task[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -237,10 +402,429 @@ model ShipmentLegStatusHistory {
   @@index([shipmentLegId])
 }
 
-// -- FUTURE (phase 3): fleet management
-// model Vehicle {
-//   id, tenantId, plateNumber, type, capacity, status, ...
-// }
-// model Driver {
-//   id, tenantId, userId (links to a User with a future DRIVER role), licenseNumber, status, ...
-// }
+// A tenant's roster of drivers. userId optionally links to a User with role
+// DRIVER (for app login) -- a driver can exist as a roster row without one.
+// The (tenantId, userId) uniqueness-when-present is enforced by a follow-up
+// partial unique index (Prisma's schema DSL can't express a WHERE clause).
+model Driver {
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  userId        String?
+  user          User?        @relation(fields: [userId], references: [id])
+  name          String
+  licenseNumber String?
+  licenseExpiry DateTime?
+  phone         String?
+  status        DriverStatus @default(ACTIVE)
+  skills        String[]
+  homeStationId String?
+  homeStation   Station?     @relation(fields: [homeStationId], references: [id])
+  notes         String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  tasks Task[]
+  trips Trip[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model Vehicle {
+  id            String        @id @default(cuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  plateNumber   String
+  type          String
+  capacityKg    Float?
+  capacityM3    Float?
+  capabilities  String[]
+  status        VehicleStatus @default(ACTIVE)
+  homeStationId String?
+  homeStation   Station?      @relation(fields: [homeStationId], references: [id])
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  tasks Task[]
+  trips Trip[]
+
+  @@unique([tenantId, plateNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  description String?
+  leaderId    String?
+  leader      User?    @relation("TeamLeader", fields: [leaderId], references: [id])
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members TeamMember[]
+  tasks   Task[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
+}
+
+model TeamMember {
+  id       String   @id @default(cuid())
+  teamId   String
+  team     Team     @relation(fields: [teamId], references: [id])
+  userId   String
+  user     User     @relation(fields: [userId], references: [id])
+  joinedAt DateTime @default(now())
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+}
+
+// A third-party courier / warehouse operator / subcontractor a task can be
+// handed off to. type is a free label (not an enum) -- SME partner
+// categories vary too much tenant-to-tenant to hardcode a picklist.
+model Partner {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String
+  contactName  String?
+  contactPhone String?
+  contactEmail String?
+  address      String?
+  type         String?
+  isActive     Boolean  @default(true)
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tasks Task[]
+
+  @@index([tenantId])
+}
+
+// A reusable-or-one-off ordered template of stops (e.g. a recurring milk
+// run). Distinct from Trip: a Route is the plan, a Trip is one scheduled
+// execution of it (or of no route at all).
+model Route {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  name        String
+  code        String?
+  description String?
+  isTemplate  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stops RouteStop[]
+  trips Trip[]
+  tasks Task[]
+
+  @@index([tenantId])
+}
+
+model RouteStop {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  routeId        String
+  route          Route    @relation(fields: [routeId], references: [id])
+  sequenceNumber Int
+  facilityId     String?
+  facility       Station? @relation(fields: [facilityId], references: [id])
+  name           String?
+  address        String?
+  latitude       Float?
+  longitude      Float?
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tasks Task[]
+
+  @@unique([routeId, sequenceNumber])
+  @@index([tenantId])
+  @@index([routeId])
+}
+
+// A scheduled execution: driver + vehicle + date, optionally following a
+// Route template.
+model Trip {
+  id            String     @id @default(cuid())
+  tenantId      String
+  tenant        Tenant     @relation(fields: [tenantId], references: [id])
+  tripNumber    String
+  routeId       String?
+  route         Route?     @relation(fields: [routeId], references: [id])
+  driverId      String?
+  driver        Driver?    @relation(fields: [driverId], references: [id])
+  vehicleId     String?
+  vehicle       Vehicle?   @relation(fields: [vehicleId], references: [id])
+  status        TripStatus @default(PLANNED)
+  scheduledDate DateTime?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  notes         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  tasks Task[]
+
+  @@unique([tenantId, tripNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+}
+
+// Tenant-configurable catalogue of task types -- proof requirements,
+// allowed statuses, and other per-type behavior are read from this table at
+// request time rather than hardcoded per taskType in source, so a tenant
+// can adjust their workflow without a deploy. category is a free String for
+// the same reason. completionChecklist is a definition only in this pass --
+// no per-instance checked/unchecked state is persisted yet.
+model TaskTypeConfig {
+  id                            String              @id @default(cuid())
+  tenantId                      String
+  tenant                        Tenant              @relation(fields: [tenantId], references: [id])
+  code                          String
+  name                          String
+  category                      String
+  allowedStatuses               TaskStatus[]
+  requiredFields                String[]
+  requiredProofTypes            ProofType[]
+  allowedAssigneeTypes          AssigneeType[]
+  defaultServiceDurationMinutes Int?
+  locationRequirement           LocationRequirement @default(ANY)
+  cargoRequirement              CargoRequirement    @default(OPTIONAL)
+  facilityRequirement           Boolean             @default(false)
+  isRouteable                   Boolean             @default(true)
+  isBillable                    Boolean             @default(false)
+  isCustomerFacing              Boolean             @default(true)
+  failureReasonCodes            ExceptionType[]
+  completionChecklist           String[]
+  isActive                      Boolean             @default(true)
+  createdAt                     DateTime            @default(now())
+  updatedAt                     DateTime            @updatedAt
+
+  tasks Task[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+}
+
+// The unit of operational work -- pickup, delivery, receiving, loading,
+// sorting, inspection, etc. May originate from a Service Order or be
+// created standalone (e.g. vehicle inspection, warehouse handling). Not
+// coupled to first/middle/last-mile: the same model expresses direct
+// trucking, multi-stop distribution, and intercity hub-to-hub workflows.
+model Task {
+  id         String         @id @default(cuid())
+  tenantId   String
+  tenant     Tenant         @relation(fields: [tenantId], references: [id])
+  taskNumber String
+  taskTypeId String
+  taskType   TaskTypeConfig @relation(fields: [taskTypeId], references: [id])
+  status     TaskStatus     @default(DRAFT)
+  priority   TaskPriority   @default(NORMAL)
+
+  serviceOrderId String?
+  serviceOrder   ServiceOrder? @relation(fields: [serviceOrderId], references: [id])
+  customerId     String?
+  customer       Customer?     @relation(fields: [customerId], references: [id])
+
+  tripId  String?
+  trip    Trip?      @relation(fields: [tripId], references: [id])
+  routeId String?
+  route   Route?     @relation(fields: [routeId], references: [id])
+  stopId  String?
+  stop    RouteStop? @relation(fields: [stopId], references: [id])
+
+  facilityId String?
+  facility   Station? @relation(fields: [facilityId], references: [id])
+
+  assignedDriverId  String?
+  assignedDriver    Driver?  @relation(fields: [assignedDriverId], references: [id])
+  assignedVehicleId String?
+  assignedVehicle   Vehicle? @relation(fields: [assignedVehicleId], references: [id])
+  assignedStaffId   String?
+  assignedStaff     User?    @relation("TaskAssignedStaff", fields: [assignedStaffId], references: [id])
+  assignedTeamId    String?
+  assignedTeam      Team?    @relation(fields: [assignedTeamId], references: [id])
+  assignedPartnerId String?
+  assignedPartner   Partner? @relation(fields: [assignedPartnerId], references: [id])
+
+  // Location -- flat, snapshotted at write time from whichever source is set
+  // (facility/customer/partner), or entered directly when locationType =
+  // CUSTOM. Snapshotted so a later address change on the source doesn't
+  // silently rewrite what a driver was actually sent to.
+  locationType         TaskLocationType @default(CUSTOM)
+  locationName         String?
+  locationAddress      String?
+  locationLatitude     Float?
+  locationLongitude    Float?
+  locationContactName  String?
+  locationContactPhone String?
+  locationAccessNotes  String?
+
+  scheduledDate                   DateTime?
+  timeWindowStart                 DateTime?
+  timeWindowEnd                   DateTime?
+  estimatedServiceDurationMinutes Int?
+  actualStartTime                 DateTime?
+  actualCompletionTime            DateTime?
+
+  requiredSkills              String[]
+  requiredVehicleCapabilities String[]
+
+  instructions   String?
+  notes          String?
+  sequenceNumber Int?
+
+  parentTaskId String?
+  parentTask   Task?   @relation("TaskParent", fields: [parentTaskId], references: [id])
+  subtasks     Task[]  @relation("TaskParent")
+
+  createdById String?
+  createdBy   User?    @relation("TaskCreatedBy", fields: [createdById], references: [id])
+  updatedById String?
+  updatedBy   User?    @relation("TaskUpdatedBy", fields: [updatedById], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(1)
+
+  statusHistory             TaskStatusHistory[]
+  shipmentLinks             TaskShipment[]
+  proofs                    TaskProofOfCompletion[]
+  exceptions                TaskException[]
+  exceptionFollowUps        TaskException[]         @relation("ExceptionFollowUpTask")
+  dependenciesAsPredecessor TaskDependency[]        @relation("DependencyPredecessor")
+  dependenciesAsSuccessor   TaskDependency[]        @relation("DependencySuccessor")
+
+  @@unique([tenantId, taskNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, scheduledDate])
+  @@index([tenantId, assignedDriverId])
+  @@index([tenantId, assignedVehicleId])
+  @@index([tenantId, tripId])
+  @@index([tenantId, routeId])
+  @@index([serviceOrderId])
+  @@index([customerId])
+}
+
+// Links a Task to the Shipment(s) (cargo units) it's moving -- the spec's
+// "shipmentIds"/"cargoItemIds" are the same underlying relationship, so one
+// join table covers both instead of inventing a parallel CargoItem concept.
+model TaskShipment {
+  id         String   @id @default(cuid())
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id])
+  shipmentId String
+  shipment   Shipment @relation(fields: [shipmentId], references: [id])
+  createdAt  DateTime @default(now())
+
+  @@unique([taskId, shipmentId])
+  @@index([taskId])
+  @@index([shipmentId])
+}
+
+// Wider than ServiceOrderStatusHistory/ShipmentLegStatusHistory -- Task's
+// lifecycle carries reschedule and permission-override facts that need to
+// be structured and queryable, not just a free-text note. clientRequestId
+// backs idempotent replay of a mutating request (see the tasks service).
+model TaskStatusHistory {
+  id                      String     @id @default(cuid())
+  taskId                  String
+  task                    Task       @relation(fields: [taskId], references: [id])
+  status                  TaskStatus
+  note                    String?
+  previousScheduledDate   DateTime?
+  previousTimeWindowStart DateTime?
+  previousTimeWindowEnd   DateTime?
+  isOverride              Boolean    @default(false)
+  overrideReason          String?
+  clientRequestId         String?
+  changedById             String?
+  changedBy               User?      @relation("TaskStatusChangedBy", fields: [changedById], references: [id])
+  changedAt               DateTime   @default(now())
+
+  @@unique([taskId, clientRequestId])
+  @@index([taskId])
+}
+
+// fileUrl is a plain string the client obtains elsewhere -- no upload infra
+// (S3/multer/etc.) exists in this codebase yet.
+model TaskProofOfCompletion {
+  id           String    @id @default(cuid())
+  taskId       String
+  task         Task      @relation(fields: [taskId], references: [id])
+  type         ProofType
+  fileUrl      String?
+  textValue    String?
+  numericValue Float?
+  latitude     Float?
+  longitude    Float?
+  capturedById String?
+  capturedBy   User?     @relation("TaskProofCapturedBy", fields: [capturedById], references: [id])
+  capturedAt   DateTime  @default(now())
+
+  @@index([taskId])
+}
+
+model TaskException {
+  id             String            @id @default(cuid())
+  tenantId       String
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
+  taskId         String
+  task           Task              @relation(fields: [taskId], references: [id])
+  type           ExceptionType
+  severity       ExceptionSeverity @default(MEDIUM)
+  status         ExceptionStatus   @default(OPEN)
+  description    String?
+  reportedById   String?
+  reportedBy     User?             @relation("ExceptionReportedBy", fields: [reportedById], references: [id])
+  reportedAt     DateTime          @default(now())
+  assignedToId   String?
+  assignedTo     User?             @relation("ExceptionAssignedTo", fields: [assignedToId], references: [id])
+  resolution     String?
+  resolvedById   String?
+  resolvedBy     User?             @relation("ExceptionResolvedBy", fields: [resolvedById], references: [id])
+  resolvedAt     DateTime?
+  followUpTaskId String?
+  followUpTask   Task?             @relation("ExceptionFollowUpTask", fields: [followUpTaskId], references: [id])
+  closedById     String?
+  closedBy       User?             @relation("ExceptionClosedBy", fields: [closedById], references: [id])
+  closedAt       DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([tenantId])
+  @@index([taskId])
+  @@index([tenantId, status])
+}
+
+// A simple, validated dependency graph -- not a general workflow engine.
+// predecessor must (per type) reach a qualifying state before the successor
+// can proceed; cycles are rejected at write time by the service layer.
+model TaskDependency {
+  id                String         @id @default(cuid())
+  tenantId          String
+  tenant            Tenant         @relation(fields: [tenantId], references: [id])
+  predecessorTaskId String
+  predecessorTask   Task           @relation("DependencyPredecessor", fields: [predecessorTaskId], references: [id])
+  successorTaskId   String
+  successorTask     Task           @relation("DependencySuccessor", fields: [successorTaskId], references: [id])
+  type              DependencyType
+  createdAt         DateTime       @default(now())
+
+  @@unique([predecessorTaskId, successorTaskId])
+  @@index([tenantId])
+  @@index([successorTaskId])
+}

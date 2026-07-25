@@ -3,6 +3,7 @@ import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../middleware/requireRole";
 import { shipmentLegsNestedRoutes } from "../shipmentLegs/shipmentLegs.routes";
 import { shipmentsNestedRoutes } from "../shipments/shipments.routes";
+import { tasksNestedRoutes } from "../tasks/tasks.routes";
 import * as controller from "./serviceOrders.controller";
 
 export const serviceOrdersRoutes = Router();
@@ -17,3 +18,4 @@ serviceOrdersRoutes.patch("/:id/status", asyncHandler(controller.updateStatus));
 
 serviceOrdersRoutes.use("/:serviceOrderId/shipments", shipmentsNestedRoutes);
 serviceOrdersRoutes.use("/:serviceOrderId/legs", shipmentLegsNestedRoutes);
+serviceOrdersRoutes.use("/:serviceOrderId/tasks", tasksNestedRoutes);

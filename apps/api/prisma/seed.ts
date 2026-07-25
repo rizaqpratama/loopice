@@ -44,6 +44,32 @@ async function findOrCreateStation(
   return prisma.station.create({ data: { tenantId, ...data } });
 }
 
+async function findOrCreateTaskTypeConfig(
+  tenantId: string,
+  data: {
+    code: string;
+    name: string;
+    category: string;
+    requiredProofTypes?: string[];
+    isCustomerFacing?: boolean;
+  }
+) {
+  const existing = await prisma.taskTypeConfig.findUnique({
+    where: { tenantId_code: { tenantId, code: data.code } },
+  });
+  if (existing) return existing;
+  return prisma.taskTypeConfig.create({
+    data: {
+      tenantId,
+      code: data.code,
+      name: data.name,
+      category: data.category,
+      requiredProofTypes: data.requiredProofTypes ?? [],
+      isCustomerFacing: data.isCustomerFacing ?? true,
+    },
+  });
+}
+
 type LegStatus = "PLANNED" | "IN_TRANSIT" | "ARRIVED";
 
 async function createSeedLeg(
@@ -142,6 +168,26 @@ async function main() {
     stations.push(await findOrCreateStation(tenant.id, seed));
   }
   const [jakarta, bandung, surabaya] = stations;
+
+  const taskTypeSeeds = [
+    { code: "PICKUP", name: "Pickup", category: "TRANSPORT", requiredProofTypes: ["SIGNATURE"] },
+    { code: "DELIVERY", name: "Delivery", category: "TRANSPORT", requiredProofTypes: ["SIGNATURE", "RECIPIENT_NAME"] },
+    { code: "RECEIVING", name: "Receiving", category: "WAREHOUSE", requiredProofTypes: ["QUANTITY_CONFIRMATION"], isCustomerFacing: false },
+    { code: "LOADING", name: "Loading", category: "WAREHOUSE", requiredProofTypes: ["BARCODE_SCAN"], isCustomerFacing: false },
+    { code: "UNLOADING", name: "Unloading", category: "WAREHOUSE", requiredProofTypes: ["BARCODE_SCAN"], isCustomerFacing: false },
+    { code: "SORTING", name: "Sorting", category: "WAREHOUSE", isCustomerFacing: false },
+    { code: "CONSOLIDATION", name: "Consolidation", category: "WAREHOUSE", isCustomerFacing: false },
+    { code: "DECONSOLIDATION", name: "Deconsolidation", category: "WAREHOUSE", isCustomerFacing: false },
+    { code: "INSPECTION", name: "Inspection", category: "QUALITY", requiredProofTypes: ["PHOTO", "CONDITION_CONFIRMATION"], isCustomerFacing: false },
+    { code: "CUSTOMER_HANDOVER", name: "Customer Handover", category: "TRANSPORT", requiredProofTypes: ["SIGNATURE"] },
+    { code: "PARTNER_HANDOVER", name: "Partner Handover", category: "TRANSPORT", isCustomerFacing: false },
+    { code: "RETURN", name: "Return", category: "TRANSPORT", requiredProofTypes: ["CONDITION_CONFIRMATION"] },
+    { code: "TRANSFER", name: "Transfer", category: "TRANSPORT", isCustomerFacing: false },
+    { code: "OTHER", name: "Other", category: "GENERAL" },
+  ];
+  for (const seed of taskTypeSeeds) {
+    await findOrCreateTaskTypeConfig(tenant.id, seed);
+  }
 
   const existingServiceOrders = await prisma.serviceOrder.count({ where: { tenantId: tenant.id } });
   if (existingServiceOrders === 0) {

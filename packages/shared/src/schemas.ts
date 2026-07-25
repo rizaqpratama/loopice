@@ -3,6 +3,18 @@ import { SERVICE_ORDER_STATUSES } from "./serviceOrderStatus";
 import { SHIPMENT_LEG_STATUSES } from "./shipmentLegStatus";
 import { SHIPMENT_TYPES } from "./shipmentType";
 import { USER_ROLES } from "./roles";
+import { TASK_STATUSES } from "./taskStatus";
+import {
+  TASK_PRIORITIES,
+  TASK_LOCATION_TYPES,
+  ASSIGNEE_TYPES,
+  LOCATION_REQUIREMENTS,
+  CARGO_REQUIREMENTS,
+} from "./taskEnums";
+import { DRIVER_STATUSES, VEHICLE_STATUSES, TRIP_STATUSES } from "./fleetEnums";
+import { EXCEPTION_TYPES, EXCEPTION_SEVERITIES, EXCEPTION_STATUSES } from "./exceptionType";
+import { DEPENDENCY_TYPES } from "./dependencyType";
+import { PROOF_TYPES } from "./proofType";
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -124,4 +136,306 @@ export const createShipmentLegSchema = z
 export const updateShipmentLegStatusSchema = z.object({
   status: z.enum(SHIPMENT_LEG_STATUSES),
   note: z.string().optional(),
+});
+
+// -- Task management --------------------------------------------------
+
+const taskLocationFields = {
+  locationType: z.enum(TASK_LOCATION_TYPES).optional(),
+  locationName: z.string().optional(),
+  locationAddress: z.string().optional(),
+  locationLatitude: z.number().optional(),
+  locationLongitude: z.number().optional(),
+  locationContactName: z.string().optional(),
+  locationContactPhone: z.string().optional(),
+  locationAccessNotes: z.string().optional(),
+};
+
+export const createTaskSchema = z.object({
+  taskTypeId: z.string().min(1),
+  priority: z.enum(TASK_PRIORITIES).optional(),
+  serviceOrderId: z.string().optional(),
+  customerId: z.string().optional(),
+  facilityId: z.string().optional(),
+  shipmentIds: z.array(z.string()).optional(),
+  scheduledDate: z.string().datetime().optional(),
+  timeWindowStart: z.string().datetime().optional(),
+  timeWindowEnd: z.string().datetime().optional(),
+  estimatedServiceDurationMinutes: z.number().int().positive().optional(),
+  requiredSkills: z.array(z.string()).optional(),
+  requiredVehicleCapabilities: z.array(z.string()).optional(),
+  instructions: z.string().optional(),
+  notes: z.string().optional(),
+  ...taskLocationFields,
+});
+
+export const updateTaskSchema = z.object({
+  priority: z.enum(TASK_PRIORITIES).optional(),
+  facilityId: z.string().optional(),
+  scheduledDate: z.string().datetime().nullable().optional(),
+  timeWindowStart: z.string().datetime().nullable().optional(),
+  timeWindowEnd: z.string().datetime().nullable().optional(),
+  estimatedServiceDurationMinutes: z.number().int().positive().nullable().optional(),
+  requiredSkills: z.array(z.string()).optional(),
+  requiredVehicleCapabilities: z.array(z.string()).optional(),
+  instructions: z.string().optional(),
+  notes: z.string().optional(),
+  ...taskLocationFields,
+  expectedVersion: z.number().int(),
+});
+
+export const assignTaskSchema = z
+  .object({
+    assignedDriverId: z.string().optional(),
+    assignedVehicleId: z.string().optional(),
+    assignedStaffId: z.string().optional(),
+    assignedTeamId: z.string().optional(),
+    assignedPartnerId: z.string().optional(),
+    tripId: z.string().optional(),
+    routeId: z.string().optional(),
+    stopId: z.string().optional(),
+    override: z.boolean().optional(),
+    overrideReason: z.string().optional(),
+    expectedVersion: z.number().int(),
+    clientRequestId: z.string().optional(),
+  })
+  .refine(
+    (data) =>
+      !!(
+        data.assignedDriverId ||
+        data.assignedVehicleId ||
+        data.assignedStaffId ||
+        data.assignedTeamId ||
+        data.assignedPartnerId
+      ),
+    { message: "At least one assignee must be provided" }
+  )
+  .refine((data) => !data.override || !!data.overrideReason, {
+    message: "overrideReason is required when override is true",
+    path: ["overrideReason"],
+  });
+
+export const unassignTaskSchema = z.object({
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+export const updateTaskStatusSchema = z.object({
+  status: z.enum(TASK_STATUSES),
+  note: z.string().optional(),
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+export const rescheduleTaskSchema = z.object({
+  scheduledDate: z.string().datetime().optional(),
+  timeWindowStart: z.string().datetime().optional(),
+  timeWindowEnd: z.string().datetime().optional(),
+  reason: z.string().min(1),
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+export const cancelTaskSchema = z.object({
+  reason: z.string().min(1),
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+const proofEntrySchema = z.object({
+  type: z.enum(PROOF_TYPES),
+  fileUrl: z.string().optional(),
+  textValue: z.string().optional(),
+  numericValue: z.number().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+});
+
+export const completeTaskSchema = z.object({
+  note: z.string().optional(),
+  proof: z.array(proofEntrySchema).optional(),
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+export const partialCompleteTaskSchema = z.object({
+  note: z.string().min(1),
+  proof: z.array(proofEntrySchema).optional(),
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+export const failTaskSchema = z.object({
+  exceptionType: z.enum(EXCEPTION_TYPES),
+  note: z.string().optional(),
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+export const addProofSchema = proofEntrySchema;
+
+export const createExceptionSchema = z.object({
+  type: z.enum(EXCEPTION_TYPES),
+  severity: z.enum(EXCEPTION_SEVERITIES).optional(),
+  description: z.string().optional(),
+});
+
+export const updateExceptionSchema = z.object({
+  severity: z.enum(EXCEPTION_SEVERITIES).optional(),
+  status: z.enum(EXCEPTION_STATUSES).optional(),
+  assignedToId: z.string().nullable().optional(),
+  resolution: z.string().optional(),
+  followUpTaskId: z.string().optional(),
+});
+
+export const addDependencySchema = z.object({
+  relatedTaskId: z.string().min(1),
+  type: z.enum(DEPENDENCY_TYPES),
+  direction: z.enum(["predecessor", "successor"]),
+});
+
+export const bulkAssignSchema = z
+  .object({
+    taskIds: z.array(z.string()).min(1),
+    assignedDriverId: z.string().optional(),
+    assignedVehicleId: z.string().optional(),
+    assignedStaffId: z.string().optional(),
+    assignedTeamId: z.string().optional(),
+    assignedPartnerId: z.string().optional(),
+    override: z.boolean().optional(),
+    overrideReason: z.string().optional(),
+  })
+  .refine((data) => !data.override || !!data.overrideReason, {
+    message: "overrideReason is required when override is true",
+    path: ["overrideReason"],
+  });
+
+export const bulkStatusSchema = z.object({
+  taskIds: z.array(z.string()).min(1),
+  status: z.enum(TASK_STATUSES),
+  note: z.string().optional(),
+});
+
+export const reorderSequenceSchema = z.object({
+  taskIds: z.array(z.string()).min(1),
+});
+
+// -- Fleet / grouping entities ------------------------------------------
+
+export const createDriverSchema = z.object({
+  userId: z.string().optional(),
+  name: z.string().min(1),
+  licenseNumber: z.string().optional(),
+  licenseExpiry: z.string().datetime().optional(),
+  phone: z.string().optional(),
+  skills: z.array(z.string()).optional(),
+  homeStationId: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const updateDriverSchema = createDriverSchema.partial().extend({
+  status: z.enum(DRIVER_STATUSES).optional(),
+});
+
+export const createVehicleSchema = z.object({
+  plateNumber: z.string().min(1),
+  type: z.string().min(1),
+  capacityKg: z.number().positive().optional(),
+  capacityM3: z.number().positive().optional(),
+  capabilities: z.array(z.string()).optional(),
+  homeStationId: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const updateVehicleSchema = createVehicleSchema.partial().extend({
+  status: z.enum(VEHICLE_STATUSES).optional(),
+});
+
+export const createTeamSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  leaderId: z.string().optional(),
+});
+
+export const updateTeamSchema = createTeamSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+export const addTeamMemberSchema = z.object({
+  userId: z.string().min(1),
+});
+
+export const createPartnerSchema = z.object({
+  name: z.string().min(1),
+  contactName: z.string().optional(),
+  contactPhone: z.string().optional(),
+  contactEmail: z.string().email().optional(),
+  address: z.string().optional(),
+  type: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const updatePartnerSchema = createPartnerSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+export const createTripSchema = z.object({
+  routeId: z.string().optional(),
+  driverId: z.string().optional(),
+  vehicleId: z.string().optional(),
+  scheduledDate: z.string().datetime().optional(),
+  notes: z.string().optional(),
+});
+
+export const updateTripSchema = createTripSchema.partial();
+
+export const updateTripStatusSchema = z.object({
+  status: z.enum(TRIP_STATUSES),
+});
+
+export const createRouteSchema = z.object({
+  name: z.string().min(1),
+  code: z.string().optional(),
+  description: z.string().optional(),
+  isTemplate: z.boolean().optional(),
+});
+
+export const updateRouteSchema = createRouteSchema.partial().extend({
+  isActive: z.boolean().optional(),
+});
+
+export const createRouteStopSchema = z.object({
+  facilityId: z.string().optional(),
+  name: z.string().optional(),
+  address: z.string().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  notes: z.string().optional(),
+});
+
+export const createTaskTypeConfigSchema = z.object({
+  code: z
+    .string()
+    .min(1)
+    .max(30)
+    .regex(/^[A-Z0-9_]+$/, "uppercase letters, numbers, and underscores only"),
+  name: z.string().min(1),
+  category: z.string().min(1),
+  allowedStatuses: z.array(z.enum(TASK_STATUSES)).optional(),
+  requiredFields: z.array(z.string()).optional(),
+  requiredProofTypes: z.array(z.enum(PROOF_TYPES)).optional(),
+  allowedAssigneeTypes: z.array(z.enum(ASSIGNEE_TYPES)).optional(),
+  defaultServiceDurationMinutes: z.number().int().positive().optional(),
+  locationRequirement: z.enum(LOCATION_REQUIREMENTS).optional(),
+  cargoRequirement: z.enum(CARGO_REQUIREMENTS).optional(),
+  facilityRequirement: z.boolean().optional(),
+  isRouteable: z.boolean().optional(),
+  isBillable: z.boolean().optional(),
+  isCustomerFacing: z.boolean().optional(),
+  failureReasonCodes: z.array(z.enum(EXCEPTION_TYPES)).optional(),
+  completionChecklist: z.array(z.string()).optional(),
+});
+
+export const updateTaskTypeConfigSchema = createTaskTypeConfigSchema.partial().extend({
+  isActive: z.boolean().optional(),
 });
