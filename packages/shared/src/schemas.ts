@@ -317,7 +317,7 @@ export const bulkStatusSchema = z.object({
   note: z.string().optional(),
 });
 
-export const reorderSequenceSchema = z.object({
+export const reorderTaskSequenceSchema = z.object({
   taskIds: z.array(z.string()).min(1),
 });
 
@@ -428,21 +428,42 @@ export const createRouteSchema = z.object({
   name: z.string().min(1),
   code: z.string().optional(),
   description: z.string().optional(),
+  tripId: z.string().optional(),
   isTemplate: z.boolean().optional(),
+  startLocationId: z.string().optional(),
+  endLocationId: z.string().optional(),
 });
 
-export const updateRouteSchema = createRouteSchema.partial().extend({
-  isActive: z.boolean().optional(),
+export const updateRouteSchema = z.object({
+  name: z.string().optional(),
+  code: z.string().optional(),
+  description: z.string().optional(),
+  isTemplate: z.boolean().optional(),
+  expectedVersion: z.number().int(),
 });
 
 export const createRouteStopSchema = z.object({
+  stopType: z.string().optional(),
+  sequenceNumber: z.number().int(),
   facilityId: z.string().optional(),
-  name: z.string().optional(),
+  locationName: z.string().optional(),
   address: z.string().optional(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  contactName: z.string().optional(),
+  contactPhone: z.string().optional(),
+  plannedArrivalTime: z.string().datetime().optional(),
+  plannedDepartureTime: z.string().datetime().optional(),
+  estimatedServiceDurationMinutes: z.number().int().optional(),
+  timeWindowStart: z.string().datetime().optional(),
+  timeWindowEnd: z.string().datetime().optional(),
+  accessNotes: z.string().optional(),
+  instructions: z.string().optional(),
   notes: z.string().optional(),
+  isMandatory: z.boolean().optional(),
+  sourceTaskId: z.string().optional(),
 });
+
 
 export const createTaskTypeConfigSchema = z.object({
   code: z

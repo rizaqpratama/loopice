@@ -1,5 +1,6 @@
 import { EventEmitter } from "events";
 import type { TripEventPayloads } from "./domainEvents/tripEventPayloads";
+import type { RouteEventPayloads } from "./domainEvents/routeEventPayloads";
 
 // The extension point for a future notification/billing/routing/tracking/
 // analytics integration -- not an implementation of those consumers. Emit
@@ -25,7 +26,7 @@ export interface TaskEventPayloads {
   "task.exception_resolved": { taskId: string; tenantId: string; exceptionId: string };
 }
 
-export interface DomainEventPayloads extends TaskEventPayloads, TripEventPayloads {}
+export interface DomainEventPayloads extends TaskEventPayloads, TripEventPayloads, RouteEventPayloads {}
 
 class TypedDomainEvents extends EventEmitter {
   emitTyped<K extends keyof DomainEventPayloads>(event: K, payload: DomainEventPayloads[K]): boolean {

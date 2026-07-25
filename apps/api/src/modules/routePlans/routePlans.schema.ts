@@ -2,5 +2,5 @@ export {
   createRouteSchema,
   updateRouteSchema,
   createRouteStopSchema,
-  reorderSequenceSchema,
+  reorderTaskSequenceSchema,
 } from "@loopice/shared";
