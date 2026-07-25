@@ -9,6 +9,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/httpError";
+import { SAFE_USER_SELECT } from "../../lib/safeUserSelect";
 
 const TASK_INCLUDE = {
   taskType: true,
@@ -17,16 +18,30 @@ const TASK_INCLUDE = {
   facility: true,
   assignedDriver: true,
   assignedVehicle: true,
-  assignedStaff: true,
+  assignedStaff: { select: SAFE_USER_SELECT },
   assignedTeam: true,
   assignedPartner: true,
   trip: true,
   route: true,
   stop: true,
-  statusHistory: { orderBy: { changedAt: "asc" as const } },
+  statusHistory: {
+    include: { changedBy: { select: SAFE_USER_SELECT } },
+    orderBy: { changedAt: "asc" as const },
+  },
   shipmentLinks: { include: { shipment: true } },
-  proofs: { orderBy: { capturedAt: "asc" as const } },
-  exceptions: { orderBy: { reportedAt: "asc" as const } },
+  proofs: {
+    include: { capturedBy: { select: SAFE_USER_SELECT } },
+    orderBy: { capturedAt: "asc" as const },
+  },
+  exceptions: {
+    include: {
+      reportedBy: { select: SAFE_USER_SELECT },
+      assignedTo: { select: SAFE_USER_SELECT },
+      resolvedBy: { select: SAFE_USER_SELECT },
+      closedBy: { select: SAFE_USER_SELECT },
+    },
+    orderBy: { reportedAt: "asc" as const },
+  },
 } satisfies Prisma.TaskInclude;
 
 const TERMINAL_STATUSES: TaskStatus[] = ["COMPLETED", "CANCELLED", "PARTIALLY_COMPLETED"];

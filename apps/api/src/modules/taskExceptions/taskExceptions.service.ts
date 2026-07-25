@@ -2,13 +2,14 @@ import { canTransitionExceptionStatus, type ExceptionSeverity, type ExceptionSta
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { BadRequestError, NotFoundError } from "../../lib/httpError";
+import { SAFE_USER_SELECT } from "../../lib/safeUserSelect";
 
 const EXCEPTION_INCLUDE = {
   task: true,
-  reportedBy: true,
-  assignedTo: true,
-  resolvedBy: true,
-  closedBy: true,
+  reportedBy: { select: SAFE_USER_SELECT },
+  assignedTo: { select: SAFE_USER_SELECT },
+  resolvedBy: { select: SAFE_USER_SELECT },
+  closedBy: { select: SAFE_USER_SELECT },
   followUpTask: true,
 } satisfies Prisma.TaskExceptionInclude;
 

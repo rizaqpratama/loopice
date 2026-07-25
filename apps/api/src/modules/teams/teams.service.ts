@@ -1,10 +1,11 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/httpError";
+import { SAFE_USER_SELECT } from "../../lib/safeUserSelect";
 
 const TEAM_INCLUDE = {
-  leader: true,
-  members: { include: { user: true } },
+  leader: { select: SAFE_USER_SELECT },
+  members: { include: { user: { select: SAFE_USER_SELECT } } },
 } satisfies Prisma.TeamInclude;
 
 export async function listTeams(tenantId: string, search?: string) {
