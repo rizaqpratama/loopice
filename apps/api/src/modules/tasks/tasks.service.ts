@@ -34,7 +34,102 @@ const TERMINAL_STATUSES: TaskStatus[] = ["COMPLETED", "CANCELLED", "PARTIALLY_CO
 async function assertTaskTypeInTenant(tenantId: string, taskTypeId: string) {
   const taskType = await prisma.taskTypeConfig.findFirst({ where: { id: taskTypeId, tenantId } });
   if (!taskType) throw new BadRequestError("Task type does not belong to this tenant");
+  if (!taskType.isActive) throw new BadRequestError("Task type is not active");
   return taskType;
+}
+
+// -- TaskTypeConfig-driven validation --------------------------------------
+// The configuration read from TaskTypeConfig (seeded defaults or a
+// tenant's own edits) is enforced generically here rather than hardcoded
+// per taskType code -- adding/adjusting a task type never needs a deploy.
+
+function validateRequiredFields(
+  taskType: { name: string; requiredFields: string[] },
+  input: Record<string, unknown>
+) {
+  if (taskType.requiredFields.length === 0) return;
+  const missing = taskType.requiredFields.filter((field) => {
+    const value = input[field];
+    return value === undefined || value === null || value === "";
+  });
+  if (missing.length > 0) {
+    throw new BadRequestError(`Task type "${taskType.name}" requires: ${missing.join(", ")}`);
+  }
+}
+
+function validateLocationRequirement(
+  taskType: { name: string; locationRequirement: string },
+  input: { facilityId?: string; customerId?: string; locationType?: string }
+) {
+  if (taskType.locationRequirement === "FACILITY_ONLY" && !input.facilityId) {
+    throw new BadRequestError(`Task type "${taskType.name}" requires a facility location`);
+  }
+  if (
+    taskType.locationRequirement === "CUSTOMER_ADDRESS_ONLY" &&
+    input.locationType !== "CUSTOMER_ADDRESS" &&
+    !input.customerId
+  ) {
+    throw new BadRequestError(`Task type "${taskType.name}" requires a customer address location`);
+  }
+}
+
+function validateCargoRequirement(
+  taskType: { name: string; cargoRequirement: string },
+  shipmentIds: string[] | undefined
+) {
+  const hasCargo = !!(shipmentIds && shipmentIds.length > 0);
+  if (taskType.cargoRequirement === "REQUIRED" && !hasCargo) {
+    throw new BadRequestError(`Task type "${taskType.name}" requires at least one linked shipment`);
+  }
+  if (taskType.cargoRequirement === "NONE" && hasCargo) {
+    throw new BadRequestError(`Task type "${taskType.name}" does not allow linked shipments`);
+  }
+}
+
+function validateFacilityRequirement(
+  taskType: { name: string; facilityRequirement: boolean },
+  facilityId: string | undefined
+) {
+  if (taskType.facilityRequirement && !facilityId) {
+    throw new BadRequestError(`Task type "${taskType.name}" requires a facility`);
+  }
+}
+
+function validateAssigneeTypes(
+  taskType: { name: string; allowedAssigneeTypes: string[] },
+  input: {
+    assignedDriverId?: string;
+    assignedVehicleId?: string;
+    assignedStaffId?: string;
+    assignedTeamId?: string;
+    assignedPartnerId?: string;
+  }
+) {
+  if (taskType.allowedAssigneeTypes.length === 0) return;
+  const attempted: string[] = [];
+  if (input.assignedDriverId) attempted.push("DRIVER");
+  if (input.assignedVehicleId) attempted.push("VEHICLE");
+  if (input.assignedStaffId) attempted.push("STAFF");
+  if (input.assignedTeamId) attempted.push("TEAM");
+  if (input.assignedPartnerId) attempted.push("PARTNER");
+  const disallowed = attempted.filter((t) => !taskType.allowedAssigneeTypes.includes(t));
+  if (disallowed.length > 0) {
+    throw new BadRequestError(
+      `Task type "${taskType.name}" does not allow assignee type(s): ${disallowed.join(", ")}`
+    );
+  }
+}
+
+function validateProofTypes(
+  taskType: { name: string; requiredProofTypes: string[] },
+  proof: { type: string }[] | undefined
+) {
+  if (taskType.requiredProofTypes.length === 0) return;
+  const provided = new Set((proof ?? []).map((p) => p.type));
+  const missing = taskType.requiredProofTypes.filter((t) => !provided.has(t));
+  if (missing.length > 0) {
+    throw new BadRequestError(`Task type "${taskType.name}" requires proof: ${missing.join(", ")}`);
+  }
 }
 
 async function assertServiceOrderInTenant(tenantId: string, serviceOrderId: string) {
@@ -177,13 +272,18 @@ export async function createTask(
 ) {
   const serviceOrderId = serviceOrderIdFromParams ?? input.serviceOrderId;
 
-  await assertTaskTypeInTenant(tenantId, input.taskTypeId);
+  const taskType = await assertTaskTypeInTenant(tenantId, input.taskTypeId);
   if (serviceOrderId) await assertServiceOrderInTenant(tenantId, serviceOrderId);
   if (input.customerId) await assertCustomerInTenant(tenantId, input.customerId);
   if (input.facilityId) await assertFacilityInTenant(tenantId, input.facilityId);
   if (input.shipmentIds && input.shipmentIds.length > 0) {
     await assertShipmentsInTenant(tenantId, input.shipmentIds);
   }
+
+  validateRequiredFields(taskType, { ...input, serviceOrderId });
+  validateLocationRequirement(taskType, input);
+  validateCargoRequirement(taskType, input.shipmentIds);
+  validateFacilityRequirement(taskType, input.facilityId);
 
   const MAX_ATTEMPTS = 5;
   for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
@@ -547,6 +647,7 @@ export async function assignTask(
   if (task.status !== "ASSIGNED" && !canTransitionTaskStatusForType(task.taskType, task.status, "ASSIGNED")) {
     throw new BadRequestError(`Cannot transition task from ${task.status} to ASSIGNED`);
   }
+  validateAssigneeTypes(task.taskType, input);
 
   const driver = input.assignedDriverId ? await assertDriverInTenant(tenantId, input.assignedDriverId) : null;
   const vehicle = input.assignedVehicleId
@@ -711,6 +812,7 @@ export async function completeTask(
   if (task.status !== "COMPLETED" && !canTransitionTaskStatusForType(task.taskType, task.status, "COMPLETED")) {
     throw new BadRequestError(`Cannot complete a task in ${task.status} status`);
   }
+  validateProofTypes(task.taskType, proof);
 
   return prisma.$transaction(async (tx) => {
     const now = new Date();
@@ -766,6 +868,7 @@ export async function partialCompleteTask(
   ) {
     throw new BadRequestError(`Cannot partially complete a task in ${task.status} status`);
   }
+  validateProofTypes(task.taskType, proof);
 
   return prisma.$transaction(async (tx) => {
     const now = new Date();
