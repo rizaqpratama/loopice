@@ -54,6 +54,17 @@ export function createOrder(input: CreateOrderInput) {
   return apiRequest<Order>("/orders", { method: "POST", body: input });
 }
 
+export interface UpdateOrderInput {
+  description?: string;
+  originAddress?: string;
+  destAddress?: string;
+  scheduledAt?: string | null;
+}
+
+export function updateOrder(id: string, input: UpdateOrderInput) {
+  return apiRequest<Order>(`/orders/${id}`, { method: "PATCH", body: input });
+}
+
 export function updateOrderStatus(id: string, status: OrderStatus, note?: string) {
   return apiRequest<Order>(`/orders/${id}/status`, { method: "PATCH", body: { status, note } });
 }
