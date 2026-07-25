@@ -1,6 +1,7 @@
 import * as React from "react";
 import { useNavigate } from "react-router-dom";
 import { Boxes, Plus, Users } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { ServiceOrderStatus } from "@loopice/shared";
 import { SERVICE_ORDER_STATUSES } from "@loopice/shared";
 import * as customersApi from "@/api/customers.api";
@@ -17,12 +18,9 @@ const OPEN_STATUSES: ServiceOrderStatus[] = [
   "IN_PROGRESS",
 ];
 
-const LEDGER_ROWS: { label: string; status: ServiceOrderStatus }[] = SERVICE_ORDER_STATUSES.map(
-  (status) => ({ label: status.replace("_", " "), status })
-);
-
 export function DashboardPage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [totalCustomers, setTotalCustomers] = React.useState<number | null>(null);
   const [statusCounts, setStatusCounts] = React.useState<Record<ServiceOrderStatus, number> | null>(
     null
@@ -58,15 +56,15 @@ export function DashboardPage() {
       <div className="flex items-end justify-between">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Dispatch board
+            {t("dashboard.eyebrow")}
           </p>
           <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
-            Today's manifest
+            {t("dashboard.title")}
           </h1>
         </div>
         <Button onClick={() => navigate("/service-orders/new")}>
           <Plus className="h-4 w-4" strokeWidth={2.5} />
-          New service order
+          {t("dashboard.newServiceOrder")}
         </Button>
       </div>
 
@@ -75,11 +73,13 @@ export function DashboardPage() {
         <div className="flex flex-col justify-between rounded-md bg-foreground p-6 text-background lg:col-span-2">
           <div className="flex items-center gap-2 opacity-70">
             <Boxes className="h-4 w-4" strokeWidth={2} />
-            <p className="font-mono text-xs uppercase tracking-[0.15em]">Open service orders</p>
+            <p className="font-mono text-xs uppercase tracking-[0.15em]">
+              {t("dashboard.openServiceOrders")}
+            </p>
           </div>
           <p className="font-display text-6xl font-semibold tabular-nums">{openCount ?? "—"}</p>
           <p className="text-sm opacity-70">
-            of {totalServiceOrders ?? "…"} total, not yet completed, billed, closed, or cancelled
+            {t("dashboard.openServiceOrdersSubtitle", { total: totalServiceOrders ?? "…" })}
           </p>
         </div>
 
@@ -87,25 +87,25 @@ export function DashboardPage() {
         <Card className="lg:col-span-3">
           <div className="flex items-center justify-between border-b border-border px-5 py-3">
             <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-              Service order ledger
+              {t("dashboard.ledgerTitle")}
             </p>
             <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-              {totalServiceOrders ?? "…"} total
+              {totalServiceOrders ?? "…"} {t("common.total")}
             </p>
           </div>
           <div className="divide-y divide-border">
-            {LEDGER_ROWS.map((row) => (
-              <div key={row.label} className="flex items-center justify-between px-5 py-3">
-                <span className="text-sm capitalize text-foreground">{row.label.toLowerCase()}</span>
+            {SERVICE_ORDER_STATUSES.map((status) => (
+              <div key={status} className="flex items-center justify-between px-5 py-3">
+                <span className="text-sm text-foreground">{t(`status.${status}`)}</span>
                 <span className="font-display text-lg font-semibold tabular-nums text-foreground">
-                  {statusCounts ? statusCounts[row.status] : "…"}
+                  {statusCounts ? statusCounts[status] : "…"}
                 </span>
               </div>
             ))}
             <div className="flex items-center justify-between px-5 py-3">
               <span className="flex items-center gap-2 text-sm text-foreground">
                 <Boxes className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
-                Cargo units (pallets/containers/parcels)
+                {t("dashboard.cargoUnits")}
               </span>
               <span className="font-display text-lg font-semibold tabular-nums text-foreground">
                 {totalShipmentUnits ?? "…"}
@@ -117,7 +117,7 @@ export function DashboardPage() {
             >
               <span className="flex items-center gap-2 text-sm text-brand-primary">
                 <Users className="h-3.5 w-3.5" strokeWidth={2} />
-                Customers on file
+                {t("dashboard.customersOnFile")}
               </span>
               <span className="font-display text-lg font-semibold tabular-nums text-foreground">
                 {totalCustomers ?? "…"}

@@ -1,11 +1,13 @@
 import * as React from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/AuthContext";
 import { useTenantBranding } from "@/context/TenantBrandingContext";
 import { ApiError } from "@/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 
 function RouteMap() {
   return (
@@ -37,6 +39,7 @@ export function LoginPage() {
   const { login, isAuthenticated } = useAuth();
   const { branding } = useTenantBranding();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   const [email, setEmail] = React.useState("");
   const [password, setPassword] = React.useState("");
@@ -53,7 +56,7 @@ export function LoginPage() {
       await login(email, password);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Login failed");
+      setError(err instanceof ApiError ? err.message : t("auth.loginFailed"));
     } finally {
       setIsSubmitting(false);
     }
@@ -79,39 +82,42 @@ export function LoginPage() {
         </div>
         <div className="relative">
           <p className="font-mono text-xs uppercase tracking-[0.15em] opacity-70">
-            Dispatch &amp; fleet operations
+            {t("auth.dispatchFleetOps")}
           </p>
           <p className="mt-2 max-w-xs font-display text-2xl font-medium leading-snug">
-            Every order, shipment, and vehicle on one manifest.
+            {t("auth.tagline")}
           </p>
         </div>
       </div>
 
       <div className="flex flex-1 items-center justify-center bg-background px-6 py-12">
         <div className="w-full max-w-sm">
-          <div className="mb-8 flex items-center gap-2.5 md:hidden">
-            {branding?.logoUrl ? (
-              <img src={branding.logoUrl} alt={branding.name} className="h-8 w-8 rounded-sm" />
-            ) : (
-              <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-brand-primary font-display text-sm font-bold text-white">
-                {(branding?.name ?? "L").charAt(0)}
-              </div>
-            )}
-            <span className="font-display text-lg font-semibold tracking-tight text-foreground">
-              {branding?.name ?? "Loopice"}
-            </span>
+          <div className="mb-8 flex items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 md:hidden">
+              {branding?.logoUrl ? (
+                <img src={branding.logoUrl} alt={branding.name} className="h-8 w-8 rounded-sm" />
+              ) : (
+                <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-brand-primary font-display text-sm font-bold text-white">
+                  {(branding?.name ?? "L").charAt(0)}
+                </div>
+              )}
+              <span className="font-display text-lg font-semibold tracking-tight text-foreground">
+                {branding?.name ?? "Loopice"}
+              </span>
+            </div>
+            <LanguageSwitcher />
           </div>
 
           <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Welcome back
+            {t("auth.welcomeBack")}
           </p>
           <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-foreground">
-            Sign in to dispatch
+            {t("auth.signInToDispatch")}
           </h1>
 
           <form onSubmit={handleSubmit} className="mt-8 flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t("auth.email")}</Label>
               <Input
                 id="email"
                 type="email"
@@ -122,7 +128,7 @@ export function LoginPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("auth.password")}</Label>
               <Input
                 id="password"
                 type="password"
@@ -134,7 +140,7 @@ export function LoginPage() {
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" disabled={isSubmitting} className="mt-2 w-full">
-              {isSubmitting ? "Signing in…" : "Sign in"}
+              {isSubmitting ? t("auth.signingIn") : t("auth.signIn")}
             </Button>
           </form>
         </div>

@@ -1,18 +1,19 @@
 import { LayoutDashboard, Package, Palette, Users, UsersRound } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { RoleGate } from "@/components/RoleGate";
 import { useTenantBranding } from "@/context/TenantBrandingContext";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { to: "/", label: "Dashboard", end: true, icon: LayoutDashboard },
-  { to: "/customers", label: "Customers", icon: Users },
-  { to: "/service-orders", label: "Service Orders", icon: Package },
+  { to: "/", key: "nav.dashboard", end: true, icon: LayoutDashboard },
+  { to: "/customers", key: "nav.customers", icon: Users },
+  { to: "/service-orders", key: "nav.serviceOrders", icon: Package },
 ];
 
 const settingsItems = [
-  { to: "/settings/branding", label: "Branding", icon: Palette },
-  { to: "/settings/users", label: "Users", icon: UsersRound },
+  { to: "/settings/branding", key: "nav.branding", icon: Palette },
+  { to: "/settings/users", key: "nav.users", icon: UsersRound },
 ];
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
@@ -35,6 +36,7 @@ function NavTick({ isActive }: { isActive: boolean }) {
 
 export function Sidebar() {
   const { branding } = useTenantBranding();
+  const { t } = useTranslation();
 
   return (
     <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card md:flex">
@@ -64,7 +66,7 @@ export function Sidebar() {
                 <>
                   <NavTick isActive={isActive} />
                   <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
-                  {item.label}
+                  {t(item.key)}
                 </>
               )}
             </NavLink>
@@ -74,7 +76,7 @@ export function Sidebar() {
         <RoleGate allow={["TENANT_ADMIN"]}>
           <div className="mt-5 border-t border-border pt-4">
             <p className="px-4 pb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
-              Settings
+              {t("nav.settings")}
             </p>
             <div className="flex flex-col gap-0.5">
               {settingsItems.map((item) => {
@@ -85,7 +87,7 @@ export function Sidebar() {
                       <>
                         <NavTick isActive={isActive} />
                         <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
-                        {item.label}
+                        {t(item.key)}
                       </>
                     )}
                   </NavLink>

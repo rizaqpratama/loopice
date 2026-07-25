@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
 import { Plus, Search, Users } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import * as customersApi from "@/api/customers.api";
 import type { Customer } from "@/api/customers.api";
 import { Button } from "@/components/ui/button";
@@ -10,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 export function CustomersListPage() {
+  const { t } = useTranslation();
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [search, setSearch] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
@@ -56,15 +58,15 @@ export function CustomersListPage() {
       <div className="flex items-end justify-between">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Customer ledger
+            {t("customers.eyebrow")}
           </p>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
-            Customers
+            {t("customers.title")}
           </h1>
         </div>
         <Button onClick={() => setShowForm((v) => !v)}>
           <Plus className="h-4 w-4" strokeWidth={2.5} />
-          New customer
+          {t("customers.newCustomer")}
         </Button>
       </div>
 
@@ -73,29 +75,29 @@ export function CustomersListPage() {
           <CardContent className="pt-4">
             <form onSubmit={handleCreateSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
-                placeholder="Name"
+                placeholder={t("customers.namePlaceholder")}
                 required
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
               <Input
-                placeholder="Email"
+                placeholder={t("customers.emailPlaceholder")}
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
               <Input
-                placeholder="Phone"
+                placeholder={t("customers.phonePlaceholder")}
                 value={form.phone}
                 onChange={(e) => setForm({ ...form, phone: e.target.value })}
               />
               <Input
-                placeholder="Address"
+                placeholder={t("customers.addressPlaceholder")}
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
               />
               <Button type="submit" disabled={isSubmitting} className="sm:col-span-2">
-                {isSubmitting ? "Saving…" : "Save customer"}
+                {isSubmitting ? t("common.saving") : t("customers.saveCustomer")}
               </Button>
             </form>
           </CardContent>
@@ -109,14 +111,14 @@ export function CustomersListPage() {
             strokeWidth={2}
           />
           <Input
-            placeholder="Search by name…"
+            placeholder={t("customers.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
           />
         </div>
         <Button type="submit" variant="outline">
-          Search
+          {t("common.search")}
         </Button>
       </form>
 
@@ -124,17 +126,17 @@ export function CustomersListPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Address</TableHead>
+              <TableHead>{t("customers.colName")}</TableHead>
+              <TableHead>{t("customers.colEmail")}</TableHead>
+              <TableHead>{t("customers.colPhone")}</TableHead>
+              <TableHead>{t("customers.colAddress")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-muted-foreground">
-                  Loading…
+                  {t("common.loading")}
                 </TableCell>
               </TableRow>
             )}
@@ -143,7 +145,7 @@ export function CustomersListPage() {
                 <TableCell colSpan={4}>
                   <div className="flex flex-col items-center gap-2 py-10 text-center">
                     <Users className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
-                    <p className="text-sm text-muted-foreground">No customers on file yet.</p>
+                    <p className="text-sm text-muted-foreground">{t("customers.emptyState")}</p>
                   </div>
                 </TableCell>
               </TableRow>

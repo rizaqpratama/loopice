@@ -21,6 +21,7 @@ import {
   X,
   XCircle,
 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import {
   SERVICE_ORDER_STATUS_TRANSITIONS,
   SHIPMENT_TYPES,
@@ -106,6 +107,7 @@ function formatDimensions(shipment: ServiceOrder["shipments"][number]): string |
 
 export function ServiceOrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
   const [so, setSo] = React.useState<ServiceOrder | null>(null);
   const [error, setError] = React.useState<string | null>(null);
   const [transitioning, setTransitioning] = React.useState<ServiceOrderStatus | null>(null);
@@ -137,7 +139,7 @@ export function ServiceOrderDetailPage() {
       const updated = await serviceOrdersApi.updateServiceOrderStatus(id, status);
       setSo(updated);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to update status");
+      setError(err instanceof ApiError ? err.message : t("serviceOrders.failedToUpdateStatus"));
     } finally {
       setTransitioning(null);
     }
@@ -172,7 +174,7 @@ export function ServiceOrderDetailPage() {
       setIsEditing(false);
       setEditForm(null);
     } catch (err) {
-      setEditError(err instanceof ApiError ? err.message : "Failed to save changes");
+      setEditError(err instanceof ApiError ? err.message : t("serviceOrders.failedToSave"));
     } finally {
       setIsSaving(false);
     }
@@ -197,7 +199,7 @@ export function ServiceOrderDetailPage() {
       setShipmentForm(EMPTY_SHIPMENT_FORM);
       setShowShipmentForm(false);
     } catch (err) {
-      setShipmentError(err instanceof ApiError ? err.message : "Failed to add shipment");
+      setShipmentError(err instanceof ApiError ? err.message : t("serviceOrders.failedToAddShipment"));
     } finally {
       setIsSavingShipment(false);
     }
@@ -208,7 +210,7 @@ export function ServiceOrderDetailPage() {
     await load();
   }
 
-  if (!so) return <p className="text-muted-foreground">Loading…</p>;
+  if (!so) return <p className="text-muted-foreground">{t("common.loading")}</p>;
 
   const nextStatuses = SERVICE_ORDER_STATUS_TRANSITIONS[so.status];
 
@@ -220,12 +222,12 @@ export function ServiceOrderDetailPage() {
           className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-          Service Orders
+          {t("serviceOrders.backLink")}
         </Link>
         <div className="mt-2 flex items-center justify-between">
           <div>
             <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-              Service order
+              {t("serviceOrders.detailEyebrow")}
             </p>
             <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
               <span className="font-mono">{so.soNumber}</span>
@@ -244,14 +246,14 @@ export function ServiceOrderDetailPage() {
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Card>
           <CardHeader className="flex-row items-center justify-between space-y-0">
-            <CardTitle>Details</CardTitle>
+            <CardTitle>{t("serviceOrders.details")}</CardTitle>
             {!isEditing && (
               <button
                 onClick={startEditing}
                 className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-brand-primary"
               >
                 <Pencil className="h-3.5 w-3.5" strokeWidth={2} />
-                Edit
+                {t("common.edit")}
               </button>
             )}
           </CardHeader>
@@ -260,12 +262,12 @@ export function ServiceOrderDetailPage() {
             <CardContent>
               <form onSubmit={handleSaveEdit} className="flex flex-col gap-3">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="edit-description">Description</Label>
+                  <Label htmlFor="edit-description">{t("serviceOrders.description")}</Label>
                   <Input
                     id="edit-description"
                     value={editForm.description}
                     onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                    placeholder="Job notes"
+                    placeholder={t("serviceOrders.editDescriptionPlaceholder")}
                   />
                 </div>
 
@@ -275,13 +277,13 @@ export function ServiceOrderDetailPage() {
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="edit-origin" className="flex items-center gap-1.5">
                       <MapPin className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
-                      Origin
+                      {t("serviceOrders.origin")}
                     </Label>
                     <Input
                       id="edit-origin"
                       value={editForm.originAddress}
                       onChange={(e) => setEditForm({ ...editForm, originAddress: e.target.value })}
-                      placeholder="Pickup address"
+                      placeholder={t("serviceOrders.originPlaceholder")}
                       className="ml-5"
                     />
                   </div>
@@ -289,20 +291,20 @@ export function ServiceOrderDetailPage() {
                   <div className="flex flex-col gap-1.5">
                     <Label htmlFor="edit-dest" className="flex items-center gap-1.5">
                       <MapPin className="h-3.5 w-3.5 text-brand-primary" strokeWidth={2} />
-                      Destination
+                      {t("serviceOrders.destination")}
                     </Label>
                     <Input
                       id="edit-dest"
                       value={editForm.destAddress}
                       onChange={(e) => setEditForm({ ...editForm, destAddress: e.target.value })}
-                      placeholder="Drop-off address"
+                      placeholder={t("serviceOrders.destPlaceholder")}
                       className="ml-5"
                     />
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="edit-scheduled">Scheduled pickup</Label>
+                  <Label htmlFor="edit-scheduled">{t("serviceOrders.scheduledPickup")}</Label>
                   <Input
                     id="edit-scheduled"
                     type="datetime-local"
@@ -315,32 +317,36 @@ export function ServiceOrderDetailPage() {
 
                 <div className="flex gap-2">
                   <Button type="submit" size="sm" disabled={isSaving}>
-                    {isSaving ? "Saving…" : "Save changes"}
+                    {isSaving ? t("common.saving") : t("serviceOrders.saveChanges")}
                   </Button>
                   <Button type="button" size="sm" variant="outline" onClick={cancelEditing}>
                     <X className="h-3.5 w-3.5" strokeWidth={2} />
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
                 </div>
               </form>
             </CardContent>
           ) : (
             <CardContent className="flex flex-col gap-2 text-sm text-foreground">
-              <p>{so.description ?? "No description provided."}</p>
+              <p>{so.description ?? t("serviceOrders.noDescription")}</p>
               <div className="mt-1 flex flex-col gap-1 border-t border-border pt-2 text-muted-foreground">
                 <p>
-                  <span className="text-foreground">Origin:</span> {so.originAddress ?? "—"}
+                  <span className="text-foreground">{t("serviceOrders.originLabel")}</span>{" "}
+                  {so.originAddress ?? "—"}
                 </p>
                 <p>
-                  <span className="text-foreground">Destination:</span> {so.destAddress ?? "—"}
+                  <span className="text-foreground">{t("serviceOrders.destinationLabel")}</span>{" "}
+                  {so.destAddress ?? "—"}
                 </p>
                 {so.scheduledAt && (
                   <p>
-                    <span className="text-foreground">Scheduled:</span>{" "}
+                    <span className="text-foreground">{t("serviceOrders.scheduledLabel")}</span>{" "}
                     {new Date(so.scheduledAt).toLocaleString()}
                   </p>
                 )}
-                <p className="font-mono text-xs">Created {new Date(so.createdAt).toLocaleString()}</p>
+                <p className="font-mono text-xs">
+                  {t("serviceOrders.createdLabel", { date: new Date(so.createdAt).toLocaleString() })}
+                </p>
               </div>
             </CardContent>
           )}
@@ -348,11 +354,11 @@ export function ServiceOrderDetailPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Transition status</CardTitle>
+            <CardTitle>{t("serviceOrders.transitionStatus")}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2">
             {nextStatuses.length === 0 && (
-              <p className="text-sm text-muted-foreground">No further transitions available.</p>
+              <p className="text-sm text-muted-foreground">{t("serviceOrders.noTransitions")}</p>
             )}
             <div className="flex flex-wrap gap-2">
               {nextStatuses.map((status) => {
@@ -366,7 +372,9 @@ export function ServiceOrderDetailPage() {
                     onClick={() => handleTransition(status)}
                   >
                     <Icon className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    {transitioning === status ? "Updating…" : `Mark ${status.replace("_", " ")}`}
+                    {transitioning === status
+                      ? t("serviceOrders.updating")
+                      : t("serviceOrders.mark", { status: t(`status.${status}`) })}
                   </Button>
                 );
               })}
@@ -378,14 +386,16 @@ export function ServiceOrderDetailPage() {
 
       <Card>
         <CardHeader className="flex-row items-center justify-between space-y-0">
-          <CardTitle>Shipments ({so.shipments.length})</CardTitle>
+          <CardTitle>
+            {t("serviceOrders.shipments")} ({so.shipments.length})
+          </CardTitle>
           {!showShipmentForm && (
             <button
               onClick={() => setShowShipmentForm(true)}
               className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-brand-primary"
             >
               <Plus className="h-3.5 w-3.5" strokeWidth={2} />
-              Add shipment
+              {t("serviceOrders.addShipment")}
             </button>
           )}
         </CardHeader>
@@ -396,7 +406,7 @@ export function ServiceOrderDetailPage() {
               className="grid grid-cols-2 gap-3 rounded-md border border-border p-4 sm:grid-cols-3"
             >
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="shipment-type">Type</Label>
+                <Label htmlFor="shipment-type">{t("serviceOrders.type")}</Label>
                 <Select
                   id="shipment-type"
                   value={shipmentForm.type}
@@ -404,15 +414,15 @@ export function ServiceOrderDetailPage() {
                     setShipmentForm({ ...shipmentForm, type: e.target.value as ShipmentType })
                   }
                 >
-                  {SHIPMENT_TYPES.map((t) => (
-                    <option key={t} value={t}>
-                      {t}
+                  {SHIPMENT_TYPES.map((shipmentType) => (
+                    <option key={shipmentType} value={shipmentType}>
+                      {t(`shipmentType.${shipmentType}`)}
                     </option>
                   ))}
                 </Select>
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="shipment-quantity">Quantity</Label>
+                <Label htmlFor="shipment-quantity">{t("serviceOrders.quantity")}</Label>
                 <Input
                   id="shipment-quantity"
                   type="number"
@@ -422,7 +432,7 @@ export function ServiceOrderDetailPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="shipment-weight">Weight (kg)</Label>
+                <Label htmlFor="shipment-weight">{t("serviceOrders.weightKg")}</Label>
                 <Input
                   id="shipment-weight"
                   type="number"
@@ -433,7 +443,7 @@ export function ServiceOrderDetailPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="shipment-length">Length (cm)</Label>
+                <Label htmlFor="shipment-length">{t("serviceOrders.lengthCm")}</Label>
                 <Input
                   id="shipment-length"
                   type="number"
@@ -443,7 +453,7 @@ export function ServiceOrderDetailPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="shipment-width">Width (cm)</Label>
+                <Label htmlFor="shipment-width">{t("serviceOrders.widthCm")}</Label>
                 <Input
                   id="shipment-width"
                   type="number"
@@ -453,7 +463,7 @@ export function ServiceOrderDetailPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="shipment-height">Height (cm)</Label>
+                <Label htmlFor="shipment-height">{t("serviceOrders.heightCm")}</Label>
                 <Input
                   id="shipment-height"
                   type="number"
@@ -463,12 +473,12 @@ export function ServiceOrderDetailPage() {
                 />
               </div>
               <div className="col-span-2 flex flex-col gap-1.5 sm:col-span-3">
-                <Label htmlFor="shipment-description">Description</Label>
+                <Label htmlFor="shipment-description">{t("serviceOrders.description")}</Label>
                 <Input
                   id="shipment-description"
                   value={shipmentForm.description}
                   onChange={(e) => setShipmentForm({ ...shipmentForm, description: e.target.value })}
-                  placeholder="e.g. Fragile, stack no more than 2 high"
+                  placeholder={t("serviceOrders.shipmentDescriptionPlaceholder")}
                 />
               </div>
 
@@ -478,7 +488,7 @@ export function ServiceOrderDetailPage() {
 
               <div className="col-span-2 flex gap-2 sm:col-span-3">
                 <Button type="submit" size="sm" disabled={isSavingShipment}>
-                  {isSavingShipment ? "Adding…" : "Add shipment"}
+                  {isSavingShipment ? t("serviceOrders.adding") : t("serviceOrders.addShipment")}
                 </Button>
                 <Button
                   type="button"
@@ -490,16 +500,14 @@ export function ServiceOrderDetailPage() {
                     setShipmentError(null);
                   }}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
               </div>
             </form>
           )}
 
           {so.shipments.length === 0 && !showShipmentForm && (
-            <p className="text-sm text-muted-foreground">
-              No pallets, containers, or parcels added yet.
-            </p>
+            <p className="text-sm text-muted-foreground">{t("serviceOrders.noShipments")}</p>
           )}
 
           {so.shipments.map((shipment) => {
@@ -514,7 +522,7 @@ export function ServiceOrderDetailPage() {
                   <Icon className="h-4 w-4 shrink-0 text-muted-foreground" strokeWidth={2} />
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      {shipment.quantity}× {shipment.type}
+                      {shipment.quantity}× {t(`shipmentType.${shipment.type}`)}
                     </p>
                     <p className="font-mono text-xs text-muted-foreground">
                       {[
@@ -523,14 +531,14 @@ export function ServiceOrderDetailPage() {
                         shipment.description,
                       ]
                         .filter(Boolean)
-                        .join(" · ") || "No further detail"}
+                        .join(" · ") || t("serviceOrders.noFurtherDetail")}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => handleDeleteShipment(shipment.id)}
                   className="text-muted-foreground hover:text-destructive"
-                  aria-label="Remove shipment"
+                  aria-label={t("serviceOrders.removeShipment")}
                 >
                   <Trash2 className="h-3.5 w-3.5" strokeWidth={2} />
                 </button>
@@ -542,7 +550,7 @@ export function ServiceOrderDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Status history</CardTitle>
+          <CardTitle>{t("serviceOrders.statusHistory")}</CardTitle>
         </CardHeader>
         <CardContent>
           <ol className="relative flex flex-col gap-6 pl-1">

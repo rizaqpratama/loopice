@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowLeft, MapPin } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import * as customersApi from "@/api/customers.api";
 import type { Customer } from "@/api/customers.api";
 import * as serviceOrdersApi from "@/api/serviceOrders.api";
@@ -13,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function ServiceOrderCreatePage() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [customers, setCustomers] = React.useState<Customer[]>([]);
   const [customerId, setCustomerId] = React.useState("");
   const [description, setDescription] = React.useState("");
@@ -38,7 +40,7 @@ export function ServiceOrderCreatePage() {
       });
       navigate(`/service-orders/${serviceOrder.id}`, { replace: true });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create service order");
+      setError(err instanceof ApiError ? err.message : t("serviceOrders.failedToCreate"));
     } finally {
       setIsSubmitting(false);
     }
@@ -52,24 +54,24 @@ export function ServiceOrderCreatePage() {
           className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-          Service Orders
+          {t("serviceOrders.backLink")}
         </Link>
         <p className="mt-2 font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-          New service order
+          {t("serviceOrders.createEyebrow")}
         </p>
         <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
-          Create service order
+          {t("serviceOrders.createTitle")}
         </h1>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Customer &amp; route</CardTitle>
+          <CardTitle>{t("serviceOrders.customerRoute")}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="customer">Customer</Label>
+              <Label htmlFor="customer">{t("serviceOrders.customer")}</Label>
               <Select
                 id="customer"
                 required
@@ -77,7 +79,7 @@ export function ServiceOrderCreatePage() {
                 onChange={(e) => setCustomerId(e.target.value)}
               >
                 <option value="" disabled>
-                  Select a customer…
+                  {t("serviceOrders.selectCustomer")}
                 </option>
                 {customers.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -88,12 +90,12 @@ export function ServiceOrderCreatePage() {
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">{t("serviceOrders.description")}</Label>
               <Input
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Job notes -- shipments (pallets/containers/parcels) are added after creation"
+                placeholder={t("serviceOrders.createDescriptionPlaceholder")}
               />
             </div>
 
@@ -103,13 +105,13 @@ export function ServiceOrderCreatePage() {
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="origin" className="flex items-center gap-1.5">
                   <MapPin className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
-                  Origin
+                  {t("serviceOrders.origin")}
                 </Label>
                 <Input
                   id="origin"
                   value={originAddress}
                   onChange={(e) => setOriginAddress(e.target.value)}
-                  placeholder="Pickup address"
+                  placeholder={t("serviceOrders.originPlaceholder")}
                   className="ml-5"
                 />
               </div>
@@ -117,13 +119,13 @@ export function ServiceOrderCreatePage() {
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="dest" className="flex items-center gap-1.5">
                   <MapPin className="h-3.5 w-3.5 text-brand-primary" strokeWidth={2} />
-                  Destination
+                  {t("serviceOrders.destination")}
                 </Label>
                 <Input
                   id="dest"
                   value={destAddress}
                   onChange={(e) => setDestAddress(e.target.value)}
-                  placeholder="Drop-off address"
+                  placeholder={t("serviceOrders.destPlaceholder")}
                   className="ml-5"
                 />
               </div>
@@ -132,7 +134,7 @@ export function ServiceOrderCreatePage() {
             {error && <p className="text-sm text-destructive">{error}</p>}
 
             <Button type="submit" disabled={isSubmitting || !customerId}>
-              {isSubmitting ? "Creating…" : "Create service order"}
+              {isSubmitting ? t("serviceOrders.creating") : t("serviceOrders.create")}
             </Button>
           </form>
         </CardContent>

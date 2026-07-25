@@ -1,4 +1,5 @@
 import type { ServiceOrderStatus } from "@loopice/shared";
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 
 // The signature element: SO status renders as an ink stamp, the way a
@@ -54,6 +55,7 @@ export function StatusStamp({
   className?: string;
   ringOffset?: string;
 }) {
+  const { t } = useTranslation();
   return (
     <span
       className={cn(
@@ -64,7 +66,7 @@ export function StatusStamp({
         className
       )}
     >
-      {status.replace("_", " ")}
+      {t(`status.${status}`)}
     </span>
   );
 }

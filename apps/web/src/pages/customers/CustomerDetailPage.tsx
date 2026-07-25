@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Link, useParams } from "react-router-dom";
 import { ArrowLeft, Mail, MapPin, Phone } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import * as customersApi from "@/api/customers.api";
 import type { CustomerWithServiceOrders } from "@/api/customers.api";
 import { Avatar } from "@/components/ui/avatar";
@@ -9,6 +10,7 @@ import { StatusStamp } from "@/pages/serviceOrders/statusBadge";
 
 export function CustomerDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
   const [customer, setCustomer] = React.useState<CustomerWithServiceOrders | null>(null);
 
   React.useEffect(() => {
@@ -16,7 +18,7 @@ export function CustomerDetailPage() {
   }, [id]);
 
   if (!customer) {
-    return <p className="text-muted-foreground">Loading…</p>;
+    return <p className="text-muted-foreground">{t("common.loading")}</p>;
   }
 
   return (
@@ -27,7 +29,7 @@ export function CustomerDetailPage() {
           className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-3.5 w-3.5" strokeWidth={2} />
-          Customers
+          {t("customers.backLink")}
         </Link>
         <div className="mt-2 flex items-center gap-3">
           <Avatar name={customer.name} size="lg" />
@@ -39,7 +41,7 @@ export function CustomerDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Contact info</CardTitle>
+          <CardTitle>{t("customers.contactInfo")}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-2.5">
           <div className="flex items-center gap-2.5 text-sm text-foreground">
@@ -65,15 +67,15 @@ export function CustomerDetailPage() {
       <Card>
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Service Orders
+            {t("customers.serviceOrders")}
           </p>
           <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            {customer.serviceOrders.length} total
+            {customer.serviceOrders.length} {t("common.total")}
           </p>
         </div>
         {customer.serviceOrders.length === 0 ? (
           <p className="px-5 py-8 text-center text-sm text-muted-foreground">
-            No service orders yet.
+            {t("customers.emptyServiceOrders")}
           </p>
         ) : (
           <div className="divide-y divide-border">

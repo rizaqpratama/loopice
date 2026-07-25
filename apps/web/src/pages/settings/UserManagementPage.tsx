@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { AuthUser, UserRole } from "@loopice/shared";
 import * as usersApi from "@/api/users.api";
 import { ApiError } from "@/api/client";
@@ -14,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 const CREATABLE_ROLES: UserRole[] = ["TENANT_ADMIN", "DISPATCHER"];
 
 export function UserManagementPage() {
+  const { t } = useTranslation();
   const [users, setUsers] = React.useState<AuthUser[]>([]);
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState({
@@ -44,7 +46,7 @@ export function UserManagementPage() {
       setShowForm(false);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create user");
+      setError(err instanceof ApiError ? err.message : t("settings.users.failedToCreate"));
     } finally {
       setIsSubmitting(false);
     }
@@ -60,19 +62,19 @@ export function UserManagementPage() {
       <div className="flex items-end justify-between">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Team
+            {t("settings.users.eyebrow")}
           </p>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
-            Users
+            {t("settings.users.title")}
           </h1>
         </div>
         <Button onClick={() => setShowForm((v) => !v)}>
           {showForm ? (
-            "Cancel"
+            t("common.cancel")
           ) : (
             <>
               <Plus className="h-4 w-4" strokeWidth={2.5} />
-              New user
+              {t("settings.users.newUser")}
             </>
           )}
         </Button>
@@ -83,26 +85,26 @@ export function UserManagementPage() {
           <CardContent className="pt-4">
             <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
-                placeholder="First name"
+                placeholder={t("settings.users.firstNamePlaceholder")}
                 required
                 value={form.firstName}
                 onChange={(e) => setForm({ ...form, firstName: e.target.value })}
               />
               <Input
-                placeholder="Last name"
+                placeholder={t("settings.users.lastNamePlaceholder")}
                 required
                 value={form.lastName}
                 onChange={(e) => setForm({ ...form, lastName: e.target.value })}
               />
               <Input
-                placeholder="Email"
+                placeholder={t("settings.users.emailPlaceholder")}
                 type="email"
                 required
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
               <Input
-                placeholder="Temporary password"
+                placeholder={t("settings.users.tempPasswordPlaceholder")}
                 type="password"
                 required
                 minLength={8}
@@ -115,13 +117,13 @@ export function UserManagementPage() {
               >
                 {CREATABLE_ROLES.map((role) => (
                   <option key={role} value={role}>
-                    {role}
+                    {t(`role.${role}`)}
                   </option>
                 ))}
               </Select>
               {error && <p className="text-sm text-destructive sm:col-span-2">{error}</p>}
               <Button type="submit" disabled={isSubmitting} className="sm:col-span-2">
-                {isSubmitting ? "Saving…" : "Create user"}
+                {isSubmitting ? t("common.saving") : t("settings.users.createUser")}
               </Button>
             </form>
           </CardContent>
@@ -132,10 +134,10 @@ export function UserManagementPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>{t("settings.users.colName")}</TableHead>
+              <TableHead>{t("settings.users.colEmail")}</TableHead>
+              <TableHead>{t("settings.users.colRole")}</TableHead>
+              <TableHead>{t("settings.users.colStatus")}</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -151,18 +153,18 @@ export function UserManagementPage() {
                 <TableCell className="text-muted-foreground">{user.email}</TableCell>
                 <TableCell>
                   <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
-                    {user.role.replace("_", " ")}
+                    {t(`role.${user.role}`)}
                   </span>
                 </TableCell>
                 <TableCell>
                   <Badge variant={user.isActive ? "success" : "secondary"}>
-                    {user.isActive ? "Active" : "Deactivated"}
+                    {user.isActive ? t("settings.users.active") : t("settings.users.deactivated")}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   {user.isActive && (
                     <Button size="sm" variant="outline" onClick={() => handleDeactivate(user.id)}>
-                      Deactivate
+                      {t("settings.users.deactivate")}
                     </Button>
                   )}
                 </TableCell>

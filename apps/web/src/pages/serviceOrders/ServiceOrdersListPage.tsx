@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Link } from "react-router-dom";
 import { ClipboardList, Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { ServiceOrderStatus } from "@loopice/shared";
 import { SERVICE_ORDER_STATUSES } from "@loopice/shared";
 import * as serviceOrdersApi from "@/api/serviceOrders.api";
@@ -12,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { STATUS_INK, StatusStamp } from "./statusBadge";
 
 export function ServiceOrdersListPage() {
+  const { t } = useTranslation();
   const [serviceOrders, setServiceOrders] = React.useState<ServiceOrder[]>([]);
   const [status, setStatus] = React.useState<ServiceOrderStatus | "">("");
   const [isLoading, setIsLoading] = React.useState(true);
@@ -32,16 +34,16 @@ export function ServiceOrdersListPage() {
       <div className="flex items-end justify-between">
         <div>
           <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
-            Service order ledger
+            {t("serviceOrders.eyebrow")}
           </p>
           <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
-            Service Orders
+            {t("serviceOrders.title")}
           </h1>
         </div>
         <Link to="/service-orders/new">
           <Button>
             <Plus className="h-4 w-4" strokeWidth={2.5} />
-            New service order
+            {t("serviceOrders.newServiceOrder")}
           </Button>
         </Link>
       </div>
@@ -56,7 +58,7 @@ export function ServiceOrdersListPage() {
               : "border-border text-muted-foreground hover:border-foreground/40"
           )}
         >
-          All
+          {t("common.all")}
         </button>
         {SERVICE_ORDER_STATUSES.map((s) => (
           <button
@@ -67,7 +69,7 @@ export function ServiceOrdersListPage() {
               status === s ? STATUS_INK[s] : "border-border text-muted-foreground hover:border-foreground/40"
             )}
           >
-            {s.replace("_", " ")}
+            {t(`status.${s}`)}
           </button>
         ))}
       </div>
@@ -76,18 +78,18 @@ export function ServiceOrdersListPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>SO #</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Shipments</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Created</TableHead>
+              <TableHead>{t("serviceOrders.colSoNumber")}</TableHead>
+              <TableHead>{t("serviceOrders.colCustomer")}</TableHead>
+              <TableHead>{t("serviceOrders.colShipments")}</TableHead>
+              <TableHead>{t("serviceOrders.colStatus")}</TableHead>
+              <TableHead>{t("serviceOrders.colCreated")}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading && (
               <TableRow>
                 <TableCell colSpan={5} className="text-center text-muted-foreground">
-                  Loading…
+                  {t("common.loading")}
                 </TableCell>
               </TableRow>
             )}
@@ -96,7 +98,7 @@ export function ServiceOrdersListPage() {
                 <TableCell colSpan={5}>
                   <div className="flex flex-col items-center gap-2 py-10 text-center">
                     <ClipboardList className="h-6 w-6 text-muted-foreground" strokeWidth={1.5} />
-                    <p className="text-sm text-muted-foreground">No service orders found.</p>
+                    <p className="text-sm text-muted-foreground">{t("serviceOrders.emptyState")}</p>
                   </div>
                 </TableCell>
               </TableRow>
@@ -113,7 +115,7 @@ export function ServiceOrdersListPage() {
                 </TableCell>
                 <TableCell>{so.customer.name}</TableCell>
                 <TableCell className="text-muted-foreground">
-                  {so.shipments.length} {so.shipments.length === 1 ? "unit" : "units"}
+                  {t("serviceOrders.units", { count: so.shipments.length })}
                 </TableCell>
                 <TableCell>
                   <StatusStamp status={so.status} ringOffset="ring-offset-card" />
