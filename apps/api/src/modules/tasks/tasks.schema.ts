@@ -12,4 +12,5 @@ export {
   failTaskSchema,
   addProofSchema,
   createExceptionSchema,
+  addDependencySchema,
 } from "@loopice/shared";

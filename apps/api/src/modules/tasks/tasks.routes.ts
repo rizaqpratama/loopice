@@ -44,4 +44,19 @@ tasksFlatRoutes.post(
   requireRole([...WRITE_ROLES, "DRIVER"]),
   asyncHandler(controller.reportException)
 );
+tasksFlatRoutes.post(
+  "/:id/dependencies",
+  requireRole([...WRITE_ROLES]),
+  asyncHandler(controller.addDependency)
+);
+tasksFlatRoutes.get(
+  "/:id/dependencies",
+  requireRole([...READ_ROLES]),
+  asyncHandler(controller.listDependencies)
+);
+tasksFlatRoutes.delete(
+  "/:id/dependencies/:dependencyId",
+  requireRole([...WRITE_ROLES]),
+  asyncHandler(controller.removeDependency)
+);
 tasksFlatRoutes.delete("/:id", requireRole([...WRITE_ROLES]), asyncHandler(controller.remove));

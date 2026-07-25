@@ -437,6 +437,7 @@ export async function updateTaskStatus(
   if (task.status !== status && !canTransitionTaskStatusForType(task.taskType, task.status, status)) {
     throw new BadRequestError(`Cannot transition task from ${task.status} to ${status}`);
   }
+  await assertDependenciesSatisfied(id, status);
 
   return prisma.$transaction(async (tx) => {
     const result = await tx.task.updateMany({
@@ -813,6 +814,7 @@ export async function completeTask(
     throw new BadRequestError(`Cannot complete a task in ${task.status} status`);
   }
   validateProofTypes(task.taskType, proof);
+  await assertDependenciesSatisfied(id, "COMPLETED");
 
   return prisma.$transaction(async (tx) => {
     const now = new Date();
@@ -869,6 +871,7 @@ export async function partialCompleteTask(
     throw new BadRequestError(`Cannot partially complete a task in ${task.status} status`);
   }
   validateProofTypes(task.taskType, proof);
+  await assertDependenciesSatisfied(id, "PARTIALLY_COMPLETED");
 
   return prisma.$transaction(async (tx) => {
     const now = new Date();
@@ -993,4 +996,111 @@ export async function reportException(
       reportedById: actorId ?? undefined,
     },
   });
+}
+
+// -- Dependency graph -------------------------------------------------------
+// Deliberately a simple, validated graph (predecessor/successor edges with
+// a type), not a general workflow engine. Cycle detection is a
+// depth-capped BFS, not a generic graph library.
+
+const DEPENDENCY_GATED_STATUSES: TaskStatus[] = [
+  "EN_ROUTE",
+  "ARRIVED",
+  "IN_PROGRESS",
+  "COMPLETED",
+  "PARTIALLY_COMPLETED",
+];
+
+async function assertDependenciesSatisfied(taskId: string, targetStatus: TaskStatus) {
+  if (!DEPENDENCY_GATED_STATUSES.includes(targetStatus)) return;
+  const deps = await prisma.taskDependency.findMany({
+    where: { successorTaskId: taskId, type: "FINISH_TO_START" },
+    include: { predecessorTask: true },
+  });
+  const unmet = deps.filter((d) => d.predecessorTask.status !== "COMPLETED");
+  if (unmet.length > 0) {
+    throw new BadRequestError(
+      `Blocked by incomplete predecessor task(s): ${unmet.map((d) => d.predecessorTask.taskNumber).join(", ")}`
+    );
+  }
+}
+
+const MAX_CYCLE_CHECK_DEPTH = 50;
+
+async function wouldCreateCycle(predecessorTaskId: string, successorTaskId: string): Promise<boolean> {
+  let frontier = [successorTaskId];
+  const visited = new Set<string>();
+  for (let depth = 0; depth < MAX_CYCLE_CHECK_DEPTH && frontier.length > 0; depth++) {
+    if (frontier.includes(predecessorTaskId)) return true;
+    const unvisited = frontier.filter((id) => !visited.has(id));
+    unvisited.forEach((id) => visited.add(id));
+    if (unvisited.length === 0) break;
+    const edges = await prisma.taskDependency.findMany({
+      where: { predecessorTaskId: { in: unvisited } },
+      select: { successorTaskId: true },
+    });
+    frontier = edges.map((e) => e.successorTaskId);
+  }
+  return false;
+}
+
+export interface AddDependencyInput {
+  relatedTaskId: string;
+  type: "FINISH_TO_START" | "START_TO_START" | "MANUAL_RELEASE";
+  direction: "predecessor" | "successor";
+}
+
+export async function addDependency(tenantId: string, taskId: string, input: AddDependencyInput) {
+  await findScoped(tenantId, taskId);
+  if (input.relatedTaskId === taskId) {
+    throw new BadRequestError("A task cannot depend on itself");
+  }
+  const relatedTask = await prisma.task.findFirst({ where: { id: input.relatedTaskId, tenantId } });
+  if (!relatedTask) throw new BadRequestError("Related task does not belong to this tenant");
+
+  const predecessorTaskId = input.direction === "predecessor" ? input.relatedTaskId : taskId;
+  const successorTaskId = input.direction === "predecessor" ? taskId : input.relatedTaskId;
+
+  if (await wouldCreateCycle(predecessorTaskId, successorTaskId)) {
+    throw new BadRequestError("This dependency would create a cycle");
+  }
+
+  try {
+    await prisma.taskDependency.create({
+      data: { tenantId, predecessorTaskId, successorTaskId, type: input.type },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new ConflictError("This dependency already exists");
+    }
+    throw err;
+  }
+  return listDependencies(tenantId, taskId);
+}
+
+export async function listDependencies(tenantId: string, taskId: string) {
+  await findScoped(tenantId, taskId);
+  const [asPredecessor, asSuccessor] = await Promise.all([
+    prisma.taskDependency.findMany({
+      where: { tenantId, predecessorTaskId: taskId },
+      include: { successorTask: true },
+    }),
+    prisma.taskDependency.findMany({
+      where: { tenantId, successorTaskId: taskId },
+      include: { predecessorTask: true },
+    }),
+  ]);
+  return { asPredecessor, asSuccessor };
+}
+
+export async function removeDependency(tenantId: string, taskId: string, dependencyId: string) {
+  const dependency = await prisma.taskDependency.findFirst({
+    where: {
+      id: dependencyId,
+      tenantId,
+      OR: [{ predecessorTaskId: taskId }, { successorTaskId: taskId }],
+    },
+  });
+  if (!dependency) throw new NotFoundError("Dependency not found on this task");
+  await prisma.taskDependency.delete({ where: { id: dependencyId } });
 }

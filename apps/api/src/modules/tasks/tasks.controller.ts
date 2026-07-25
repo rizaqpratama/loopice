@@ -3,6 +3,7 @@ import type { Request, Response } from "express";
 import { BadRequestError } from "../../lib/httpError";
 import * as tasksService from "./tasks.service";
 import {
+  addDependencySchema,
   addProofSchema,
   assignTaskSchema,
   bulkAssignSchema,
@@ -222,4 +223,18 @@ export async function reportException(req: Request, res: Response) {
   res
     .status(201)
     .json(await tasksService.reportException(tenantId(req), req.params.id, input, req.user?.userId ?? null));
+}
+
+export async function addDependency(req: Request, res: Response) {
+  const input = addDependencySchema.parse(req.body);
+  res.status(201).json(await tasksService.addDependency(tenantId(req), req.params.id, input));
+}
+
+export async function listDependencies(req: Request, res: Response) {
+  res.json(await tasksService.listDependencies(tenantId(req), req.params.id));
+}
+
+export async function removeDependency(req: Request, res: Response) {
+  await tasksService.removeDependency(tenantId(req), req.params.id, req.params.dependencyId);
+  res.status(204).send();
 }
