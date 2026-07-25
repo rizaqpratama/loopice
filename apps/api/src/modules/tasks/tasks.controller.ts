@@ -1,5 +1,6 @@
 import type { TaskPriority, TaskStatus } from "@loopice/shared";
 import type { Request, Response } from "express";
+import { assertOwnsTaskOrPrivileged, findOwnDriverId } from "../../lib/assertOwnsOrPrivileged";
 import { BadRequestError } from "../../lib/httpError";
 import * as tasksService from "./tasks.service";
 import {
@@ -29,6 +30,15 @@ function parseStatusList(value: unknown): TaskStatus[] | undefined {
   return value.split(",") as TaskStatus[];
 }
 
+// DRIVER role is route-level allowed onto task endpoints but must be confined
+// to its own assigned tasks; every other role that reached this handler via
+// requireRole is unrestricted.
+async function assertTaskAccess(req: Request, taskId: string): Promise<void> {
+  if (req.user?.role !== "DRIVER") return;
+  const task = await tasksService.getTaskAssignment(tenantId(req), taskId);
+  await assertOwnsTaskOrPrivileged(tenantId(req), req.user.userId, req.user.role, task);
+}
+
 export async function list(req: Request, res: Response) {
   const {
     status,
@@ -51,12 +61,21 @@ export async function list(req: Request, res: Response) {
     limit,
   } = req.query;
 
+  // DRIVER role only ever sees its own assigned tasks -- any client-supplied
+  // assignedDriverId is ignored and overridden with the caller's own driver
+  // row (or a sentinel that matches nothing if they have none).
+  let assignedDriverIdParam = typeof assignedDriverId === "string" ? assignedDriverId : undefined;
+  if (req.user?.role === "DRIVER") {
+    const ownDriverId = await findOwnDriverId(tenantId(req), req.user.userId);
+    assignedDriverIdParam = ownDriverId ?? "__no_driver_row__";
+  }
+
   res.json(
     await tasksService.listTasks(tenantId(req), {
       status: parseStatusList(status),
       taskTypeId: typeof taskTypeId === "string" ? taskTypeId : undefined,
       priority: typeof priority === "string" ? (priority as TaskPriority) : undefined,
-      assignedDriverId: typeof assignedDriverId === "string" ? assignedDriverId : undefined,
+      assignedDriverId: assignedDriverIdParam,
       assignedVehicleId: typeof assignedVehicleId === "string" ? assignedVehicleId : undefined,
       assignedTeamId: typeof assignedTeamId === "string" ? assignedTeamId : undefined,
       assignedPartnerId: typeof assignedPartnerId === "string" ? assignedPartnerId : undefined,
@@ -87,6 +106,7 @@ export async function create(req: Request, res: Response) {
 }
 
 export async function get(req: Request, res: Response) {
+  await assertTaskAccess(req, req.params.id);
   res.json(await tasksService.getTask(tenantId(req), req.params.id));
 }
 
@@ -96,6 +116,7 @@ export async function update(req: Request, res: Response) {
 }
 
 export async function updateStatus(req: Request, res: Response) {
+  await assertTaskAccess(req, req.params.id);
   const { status, note, expectedVersion, clientRequestId } = updateTaskStatusSchema.parse(req.body);
   res.json(
     await tasksService.updateTaskStatus(
@@ -169,6 +190,7 @@ export async function bulkStatus(req: Request, res: Response) {
 }
 
 export async function complete(req: Request, res: Response) {
+  await assertTaskAccess(req, req.params.id);
   const { note, proof, expectedVersion, clientRequestId } = completeTaskSchema.parse(req.body);
   res.json(
     await tasksService.completeTask(
@@ -184,6 +206,7 @@ export async function complete(req: Request, res: Response) {
 }
 
 export async function partialComplete(req: Request, res: Response) {
+  await assertTaskAccess(req, req.params.id);
   const { note, proof, expectedVersion, clientRequestId } = partialCompleteTaskSchema.parse(req.body);
   res.json(
     await tasksService.partialCompleteTask(
@@ -199,6 +222,7 @@ export async function partialComplete(req: Request, res: Response) {
 }
 
 export async function fail(req: Request, res: Response) {
+  await assertTaskAccess(req, req.params.id);
   const { exceptionType, note, expectedVersion, clientRequestId } = failTaskSchema.parse(req.body);
   res.json(
     await tasksService.failTask(
@@ -214,11 +238,13 @@ export async function fail(req: Request, res: Response) {
 }
 
 export async function addProof(req: Request, res: Response) {
+  await assertTaskAccess(req, req.params.id);
   const input = addProofSchema.parse(req.body);
   res.status(201).json(await tasksService.addProof(tenantId(req), req.params.id, input, req.user?.userId ?? null));
 }
 
 export async function reportException(req: Request, res: Response) {
+  await assertTaskAccess(req, req.params.id);
   const input = createExceptionSchema.parse(req.body);
   res
     .status(201)

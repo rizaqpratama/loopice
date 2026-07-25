@@ -3,7 +3,14 @@ import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../middleware/requireRole";
 import * as controller from "./drivers.controller";
 
-const READ_ROLES = ["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER", "WAREHOUSE_STAFF"] as const;
+const READ_ROLES = [
+  "TENANT_ADMIN",
+  "OPERATIONS_MANAGER",
+  "DISPATCHER",
+  "WAREHOUSE_STAFF",
+  "CUSTOMER_SERVICE",
+  "READ_ONLY",
+] as const;
 const WRITE_ROLES = ["TENANT_ADMIN"] as const;
 
 export const driversRoutes = Router();

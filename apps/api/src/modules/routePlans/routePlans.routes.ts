@@ -3,20 +3,23 @@ import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../middleware/requireRole";
 import * as controller from "./routePlans.controller";
 
-const ALLOWED_ROLES = ["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER"] as const;
+const WRITE_ROLES = ["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER"] as const;
+const READ_ROLES = ["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER", "WAREHOUSE_STAFF", "READ_ONLY"] as const;
 
 // Mounted at /route-plans.
 export const routePlansFlatRoutes = Router();
-routePlansFlatRoutes.use(requireRole([...ALLOWED_ROLES]));
-routePlansFlatRoutes.get("/", asyncHandler(controller.list));
-routePlansFlatRoutes.post("/", asyncHandler(controller.create));
-routePlansFlatRoutes.get("/:id", asyncHandler(controller.get));
-routePlansFlatRoutes.patch("/:id", asyncHandler(controller.update));
-routePlansFlatRoutes.delete("/:id", asyncHandler(controller.deactivate));
-routePlansFlatRoutes.post("/:id/stops", asyncHandler(controller.createStop));
-routePlansFlatRoutes.patch("/:id/sequence", asyncHandler(controller.reorderSequence));
+routePlansFlatRoutes.get("/", requireRole([...READ_ROLES]), asyncHandler(controller.list));
+routePlansFlatRoutes.post("/", requireRole([...WRITE_ROLES]), asyncHandler(controller.create));
+routePlansFlatRoutes.get("/:id", requireRole([...READ_ROLES]), asyncHandler(controller.get));
+routePlansFlatRoutes.patch("/:id", requireRole([...WRITE_ROLES]), asyncHandler(controller.update));
+routePlansFlatRoutes.delete("/:id", requireRole([...WRITE_ROLES]), asyncHandler(controller.deactivate));
+routePlansFlatRoutes.post("/:id/stops", requireRole([...WRITE_ROLES]), asyncHandler(controller.createStop));
+routePlansFlatRoutes.patch(
+  "/:id/sequence",
+  requireRole([...WRITE_ROLES]),
+  asyncHandler(controller.reorderSequence)
+);
 
 // Mounted at /route-stops.
 export const routeStopsFlatRoutes = Router();
-routeStopsFlatRoutes.use(requireRole([...ALLOWED_ROLES]));
-routeStopsFlatRoutes.delete("/:id", asyncHandler(controller.deleteStop));
+routeStopsFlatRoutes.delete("/:id", requireRole([...WRITE_ROLES]), asyncHandler(controller.deleteStop));

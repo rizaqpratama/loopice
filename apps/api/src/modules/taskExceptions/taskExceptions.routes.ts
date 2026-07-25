@@ -3,9 +3,16 @@ import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../middleware/requireRole";
 import * as controller from "./taskExceptions.controller";
 
-const ALLOWED_ROLES = ["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER"] as const;
+const WRITE_ROLES = ["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER"] as const;
+const READ_ROLES = [
+  "TENANT_ADMIN",
+  "OPERATIONS_MANAGER",
+  "DISPATCHER",
+  "WAREHOUSE_STAFF",
+  "CUSTOMER_SERVICE",
+  "READ_ONLY",
+] as const;
 
 export const taskExceptionsRoutes = Router();
-taskExceptionsRoutes.use(requireRole([...ALLOWED_ROLES]));
-taskExceptionsRoutes.get("/:id", asyncHandler(controller.get));
-taskExceptionsRoutes.patch("/:id", asyncHandler(controller.update));
+taskExceptionsRoutes.get("/:id", requireRole([...READ_ROLES]), asyncHandler(controller.get));
+taskExceptionsRoutes.patch("/:id", requireRole([...WRITE_ROLES]), asyncHandler(controller.update));

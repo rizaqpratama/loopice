@@ -3,7 +3,7 @@ import { asyncHandler } from "../../lib/asyncHandler";
 import { requireRole } from "../../middleware/requireRole";
 import * as controller from "./shipmentLegs.controller";
 
-const ALLOWED_ROLES = ["TENANT_ADMIN", "DISPATCHER"] as const;
+const ALLOWED_ROLES = ["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER"] as const;
 
 // Nested under /service-orders/:serviceOrderId/legs -- create only, since
 // legs are always returned embedded on the service order detail.

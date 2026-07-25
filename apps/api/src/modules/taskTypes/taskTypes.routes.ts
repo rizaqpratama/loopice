@@ -9,6 +9,7 @@ const READ_ROLES = [
   "DISPATCHER",
   "WAREHOUSE_STAFF",
   "CUSTOMER_SERVICE",
+  "READ_ONLY",
 ] as const;
 const WRITE_ROLES = ["TENANT_ADMIN"] as const;
 

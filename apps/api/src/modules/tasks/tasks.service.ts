@@ -363,6 +363,17 @@ export async function getTask(tenantId: string, id: string) {
   return findScoped(tenantId, id);
 }
 
+// Lightweight lookup for the DRIVER-role ownership check -- avoids pulling
+// the full TASK_INCLUDE graph just to compare assignedDriverId.
+export async function getTaskAssignment(tenantId: string, id: string) {
+  const task = await prisma.task.findFirst({
+    where: { id, tenantId },
+    select: { assignedDriverId: true },
+  });
+  if (!task) throw new NotFoundError("Task not found");
+  return task;
+}
+
 export interface UpdateTaskInput {
   priority?: TaskPriority;
   facilityId?: string;
