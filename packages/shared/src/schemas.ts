@@ -11,7 +11,8 @@ import {
   LOCATION_REQUIREMENTS,
   CARGO_REQUIREMENTS,
 } from "./taskEnums";
-import { DRIVER_STATUSES, VEHICLE_STATUSES, TRIP_STATUSES } from "./fleetEnums";
+import { DRIVER_STATUSES, VEHICLE_STATUSES } from "./fleetEnums";
+import { TRIP_STATUSES } from "./tripEnums";
 import { EXCEPTION_TYPES, EXCEPTION_SEVERITIES, EXCEPTION_STATUSES } from "./exceptionType";
 import { DEPENDENCY_TYPES } from "./dependencyType";
 import { PROOF_TYPES } from "./proofType";
