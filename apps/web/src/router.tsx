@@ -12,6 +12,7 @@ import { ServiceOrderDetailPage } from "@/pages/serviceOrders/ServiceOrderDetail
 import { TaskPoolPage } from "@/pages/tasks/TaskPoolPage";
 import { TaskCreatePage } from "@/pages/tasks/TaskCreatePage";
 import { TaskDetailPage } from "@/pages/tasks/TaskDetailPage";
+import { DispatchBoardPage } from "@/pages/dispatch/DispatchBoardPage";
 import { TenantBrandingSettingsPage } from "@/pages/settings/TenantBrandingSettingsPage";
 import { UserManagementPage } from "@/pages/settings/UserManagementPage";
 import { StationsSettingsPage } from "@/pages/settings/StationsSettingsPage";
@@ -43,6 +44,19 @@ export function AppRouter() {
       <Route path="/tasks" element={<Shell><TaskPoolPage /></Shell>} />
       <Route path="/tasks/new" element={<Shell><TaskCreatePage /></Shell>} />
       <Route path="/tasks/:id" element={<Shell><TaskDetailPage /></Shell>} />
+      <Route
+        path="/dispatch"
+        element={
+          <Shell>
+            <RoleGate
+              allow={["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER"]}
+              fallback={<Navigate to="/" replace />}
+            >
+              <DispatchBoardPage />
+            </RoleGate>
+          </Shell>
+        }
+      />
       <Route
         path="/settings/branding"
         element={

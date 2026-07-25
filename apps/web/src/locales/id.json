@@ -22,7 +22,8 @@
     "drivers": "Pengemudi",
     "vehicles": "Kendaraan",
     "teams": "Tim",
-    "partners": "Mitra"
+    "partners": "Mitra",
+    "dispatchBoard": "Papan Dispatch"
   },
   "auth": {
     "welcomeBack": "Selamat datang kembali",
@@ -232,6 +233,17 @@
     "markPartial": "Tandai selesai sebagian",
     "partialNotePlaceholder": "Alasan penyelesaian sebagian (wajib)",
     "failedToPartialComplete": "Gagal menandai tugas selesai sebagian"
+  },
+  "dispatchBoard": {
+    "eyebrow": "Dispatch langsung",
+    "title": "Papan Dispatch",
+    "unassigned": "Belum Ditugaskan",
+    "noUnassigned": "Tidak ada yang menunggu.",
+    "noTasks": "Tidak ada tugas.",
+    "timeConflict": "Jendela waktu tumpang tindih dengan tugas lain di jalur ini",
+    "failedToAssign": "Gagal menugaskan tugas",
+    "failedToUnassign": "Gagal membatalkan penugasan",
+    "failedToReorder": "Gagal mengurutkan ulang tugas"
   },
   "settings": {
     "branding": {

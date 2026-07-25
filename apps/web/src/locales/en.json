@@ -22,7 +22,8 @@
     "drivers": "Drivers",
     "vehicles": "Vehicles",
     "teams": "Teams",
-    "partners": "Partners"
+    "partners": "Partners",
+    "dispatchBoard": "Dispatch Board"
   },
   "auth": {
     "welcomeBack": "Welcome back",
@@ -233,6 +234,17 @@
     "markPartial": "Mark partially completed",
     "partialNotePlaceholder": "Reason for partial completion (required)",
     "failedToPartialComplete": "Failed to mark task as partially completed"
+  },
+  "dispatchBoard": {
+    "eyebrow": "Live dispatch",
+    "title": "Dispatch Board",
+    "unassigned": "Unassigned",
+    "noUnassigned": "Nothing waiting.",
+    "noTasks": "No tasks.",
+    "timeConflict": "Overlapping time window with another task in this lane",
+    "failedToAssign": "Failed to assign task",
+    "failedToUnassign": "Failed to unassign task",
+    "failedToReorder": "Failed to reorder tasks"
   },
   "settings": {
     "branding": {

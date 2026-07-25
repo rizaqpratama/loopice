@@ -2,6 +2,7 @@ import {
   Building2,
   ClipboardCheck,
   LayoutDashboard,
+  LayoutGrid,
   Package,
   Palette,
   Truck,
@@ -21,6 +22,8 @@ const navItems = [
   { to: "/service-orders", key: "nav.serviceOrders", icon: Package },
   { to: "/tasks", key: "nav.tasks", icon: ClipboardCheck },
 ];
+
+const dispatchItems = [{ to: "/dispatch", key: "nav.dispatchBoard", icon: LayoutGrid }];
 
 const settingsItems = [
   { to: "/settings/branding", key: "nav.branding", icon: Palette },
@@ -89,6 +92,23 @@ export function Sidebar() {
             </NavLink>
           );
         })}
+
+        <RoleGate allow={["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER"]}>
+          {dispatchItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink key={item.to} to={item.to} className={navLinkClass}>
+                {({ isActive }) => (
+                  <>
+                    <NavTick isActive={isActive} />
+                    <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+                    {t(item.key)}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </RoleGate>
 
         <RoleGate allow={["TENANT_ADMIN"]}>
           <div className="mt-5 border-t border-border pt-4">
