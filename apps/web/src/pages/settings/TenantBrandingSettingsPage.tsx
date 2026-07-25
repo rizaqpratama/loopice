@@ -86,7 +86,7 @@ export function TenantBrandingSettingsPage() {
             </div>
 
             {error && <p className="text-sm text-destructive">{error}</p>}
-            {saved && <p className="text-sm text-emerald-600">Saved.</p>}
+            {saved && <p className="text-sm text-emerald-400">Saved.</p>}
 
             <Button type="submit" disabled={isSaving}>
               {isSaving ? "Saving…" : "Save branding"}

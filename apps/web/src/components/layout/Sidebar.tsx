@@ -19,8 +19,8 @@ export function Sidebar() {
             end={item.end}
             className={({ isActive }) =>
               cn(
-                "rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted",
-                isActive && "bg-brand-primary/10 text-brand-primary"
+                "rounded-sm px-3 py-2 text-sm font-medium text-foreground hover:bg-muted",
+                isActive && "bg-brand-primary/15 text-brand-primary"
               )
             }
           >
@@ -37,8 +37,8 @@ export function Sidebar() {
               to="/settings/branding"
               className={({ isActive }) =>
                 cn(
-                  "block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted",
-                  isActive && "bg-brand-primary/10 text-brand-primary"
+                  "block rounded-sm px-3 py-2 text-sm font-medium text-foreground hover:bg-muted",
+                  isActive && "bg-brand-primary/15 text-brand-primary"
                 )
               }
             >
@@ -48,8 +48,8 @@ export function Sidebar() {
               to="/settings/users"
               className={({ isActive }) =>
                 cn(
-                  "block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted",
-                  isActive && "bg-brand-primary/10 text-brand-primary"
+                  "block rounded-sm px-3 py-2 text-sm font-medium text-foreground hover:bg-muted",
+                  isActive && "bg-brand-primary/15 text-brand-primary"
                 )
               }
             >

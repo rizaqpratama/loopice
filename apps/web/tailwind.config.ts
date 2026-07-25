@@ -6,6 +6,8 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Tenant-driven whitelabel accent -- stays dynamic per-tenant, layered
+        // on top of the static Warp-inspired neutral system below.
         brand: {
           primary: "var(--brand-primary)",
           secondary: "var(--brand-secondary)",
@@ -28,10 +30,16 @@ export default {
           foreground: "hsl(var(--destructive-foreground))",
         },
       },
+      fontFamily: {
+        sans: ["Inter", "system-ui", "-apple-system", "Segoe UI", "Roboto", "sans-serif"],
+        mono: ["DM Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+      },
+      // Warp's tight radius scale: buttons/inputs at 3px, cards at 4px,
+      // larger surfaces at 6px. Pills/icon containers use Tailwind's rounded-full.
       borderRadius: {
-        lg: "var(--radius)",
-        md: "calc(var(--radius) - 2px)",
-        sm: "calc(var(--radius) - 4px)",
+        lg: "calc(var(--radius) + 2px)",
+        md: "var(--radius)",
+        sm: "calc(var(--radius) - 1px)",
       },
     },
   },
