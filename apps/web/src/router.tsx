@@ -9,9 +9,17 @@ import { CustomerDetailPage } from "@/pages/customers/CustomerDetailPage";
 import { ServiceOrdersListPage } from "@/pages/serviceOrders/ServiceOrdersListPage";
 import { ServiceOrderCreatePage } from "@/pages/serviceOrders/ServiceOrderCreatePage";
 import { ServiceOrderDetailPage } from "@/pages/serviceOrders/ServiceOrderDetailPage";
+import { TaskPoolPage } from "@/pages/tasks/TaskPoolPage";
+import { TaskCreatePage } from "@/pages/tasks/TaskCreatePage";
+import { TaskDetailPage } from "@/pages/tasks/TaskDetailPage";
 import { TenantBrandingSettingsPage } from "@/pages/settings/TenantBrandingSettingsPage";
 import { UserManagementPage } from "@/pages/settings/UserManagementPage";
 import { StationsSettingsPage } from "@/pages/settings/StationsSettingsPage";
+import { TaskTypesSettingsPage } from "@/pages/settings/TaskTypesSettingsPage";
+import { DriversSettingsPage } from "@/pages/settings/DriversSettingsPage";
+import { VehiclesSettingsPage } from "@/pages/settings/VehiclesSettingsPage";
+import { TeamsSettingsPage } from "@/pages/settings/TeamsSettingsPage";
+import { PartnersSettingsPage } from "@/pages/settings/PartnersSettingsPage";
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
@@ -32,6 +40,9 @@ export function AppRouter() {
       <Route path="/service-orders" element={<Shell><ServiceOrdersListPage /></Shell>} />
       <Route path="/service-orders/new" element={<Shell><ServiceOrderCreatePage /></Shell>} />
       <Route path="/service-orders/:id" element={<Shell><ServiceOrderDetailPage /></Shell>} />
+      <Route path="/tasks" element={<Shell><TaskPoolPage /></Shell>} />
+      <Route path="/tasks/new" element={<Shell><TaskCreatePage /></Shell>} />
+      <Route path="/tasks/:id" element={<Shell><TaskDetailPage /></Shell>} />
       <Route
         path="/settings/branding"
         element={
@@ -58,6 +69,56 @@ export function AppRouter() {
           <Shell>
             <RoleGate allow={["TENANT_ADMIN"]} fallback={<Navigate to="/" replace />}>
               <StationsSettingsPage />
+            </RoleGate>
+          </Shell>
+        }
+      />
+      <Route
+        path="/settings/task-types"
+        element={
+          <Shell>
+            <RoleGate allow={["TENANT_ADMIN"]} fallback={<Navigate to="/" replace />}>
+              <TaskTypesSettingsPage />
+            </RoleGate>
+          </Shell>
+        }
+      />
+      <Route
+        path="/settings/drivers"
+        element={
+          <Shell>
+            <RoleGate allow={["TENANT_ADMIN"]} fallback={<Navigate to="/" replace />}>
+              <DriversSettingsPage />
+            </RoleGate>
+          </Shell>
+        }
+      />
+      <Route
+        path="/settings/vehicles"
+        element={
+          <Shell>
+            <RoleGate allow={["TENANT_ADMIN"]} fallback={<Navigate to="/" replace />}>
+              <VehiclesSettingsPage />
+            </RoleGate>
+          </Shell>
+        }
+      />
+      <Route
+        path="/settings/teams"
+        element={
+          <Shell>
+            <RoleGate allow={["TENANT_ADMIN"]} fallback={<Navigate to="/" replace />}>
+              <TeamsSettingsPage />
+            </RoleGate>
+          </Shell>
+        }
+      />
+      <Route
+        path="/settings/partners"
+        element={
+          <Shell>
+            <RoleGate allow={["TENANT_ADMIN"]} fallback={<Navigate to="/" replace />}>
+              <PartnersSettingsPage />
             </RoleGate>
           </Shell>
         }

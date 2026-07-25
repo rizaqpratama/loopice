@@ -1,4 +1,14 @@
-import { LayoutDashboard, Package, Palette, Users, UsersRound, Warehouse } from "lucide-react";
+import {
+  Building2,
+  ClipboardCheck,
+  LayoutDashboard,
+  Package,
+  Palette,
+  Truck,
+  Users,
+  UsersRound,
+  Warehouse,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { RoleGate } from "@/components/RoleGate";
@@ -9,12 +19,18 @@ const navItems = [
   { to: "/", key: "nav.dashboard", end: true, icon: LayoutDashboard },
   { to: "/customers", key: "nav.customers", icon: Users },
   { to: "/service-orders", key: "nav.serviceOrders", icon: Package },
+  { to: "/tasks", key: "nav.tasks", icon: ClipboardCheck },
 ];
 
 const settingsItems = [
   { to: "/settings/branding", key: "nav.branding", icon: Palette },
   { to: "/settings/users", key: "nav.users", icon: UsersRound },
   { to: "/settings/stations", key: "nav.stations", icon: Warehouse },
+  { to: "/settings/task-types", key: "nav.taskTypes", icon: ClipboardCheck },
+  { to: "/settings/drivers", key: "nav.drivers", icon: Users },
+  { to: "/settings/vehicles", key: "nav.vehicles", icon: Truck },
+  { to: "/settings/teams", key: "nav.teams", icon: UsersRound },
+  { to: "/settings/partners", key: "nav.partners", icon: Building2 },
 ];
 
 function navLinkClass({ isActive }: { isActive: boolean }) {
