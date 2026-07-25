@@ -12,7 +12,7 @@ import {
   CARGO_REQUIREMENTS,
 } from "./taskEnums";
 import { DRIVER_STATUSES, VEHICLE_STATUSES } from "./fleetEnums";
-import { TRIP_STATUSES } from "./tripEnums";
+import { TRIP_STATUSES, TRIP_TYPES, TRANSFER_TYPES } from "./tripEnums";
 import { EXCEPTION_TYPES, EXCEPTION_SEVERITIES, EXCEPTION_STATUSES } from "./exceptionType";
 import { DEPENDENCY_TYPES } from "./dependencyType";
 import { PROOF_TYPES } from "./proofType";
@@ -381,17 +381,47 @@ export const updatePartnerSchema = createPartnerSchema.partial().extend({
 });
 
 export const createTripSchema = z.object({
-  routeId: z.string().optional(),
-  driverId: z.string().optional(),
-  vehicleId: z.string().optional(),
-  scheduledDate: z.string().datetime().optional(),
+  tripType: z.enum(TRIP_TYPES).optional(),
+  transferType: z.enum(TRANSFER_TYPES).optional(),
+  serviceDate: z.string().datetime().optional(),
+  originFacilityId: z.string().optional(),
+  destinationFacilityId: z.string().optional(),
+  originLocationId: z.string().optional(),
+  destinationLocationId: z.string().optional(),
+  plannedStartTime: z.string().datetime().optional(),
+  plannedEndTime: z.string().datetime().optional(),
+  instructions: z.string().optional(),
   notes: z.string().optional(),
 });
 
-export const updateTripSchema = createTripSchema.partial();
+export const updateTripSchema = z.object({
+  serviceDate: z.string().datetime().optional(),
+  plannedStartTime: z.string().datetime().optional(),
+  plannedEndTime: z.string().datetime().optional(),
+  instructions: z.string().optional(),
+  notes: z.string().optional(),
+  expectedVersion: z.number().int(),
+});
 
 export const updateTripStatusSchema = z.object({
   status: z.enum(TRIP_STATUSES),
+  note: z.string().optional(),
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+export const assignVehicleSchema = z.object({
+  vehicleId: z.string().min(1),
+  expectedVersion: z.number().int(),
+});
+
+export const assignDriverSchema = z.object({
+  driverId: z.string().min(1),
+  expectedVersion: z.number().int(),
+});
+
+export const addSecondaryDriverSchema = z.object({
+  driverId: z.string().min(1),
 });
 
 export const createRouteSchema = z.object({
