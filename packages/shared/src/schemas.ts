@@ -527,3 +527,26 @@ export const sealManifestSchema = z.object({
   sealNumber: z.string().min(1),
   expectedVersion: z.number().int(),
 });
+
+// -- Facility Handover management --------------------------------------------------
+
+export const createHandoverSchema = z.object({
+  tripId: z.string().min(1),
+  manifestId: z.string().min(1),
+  handoverType: z.enum(["ORIGIN_TO_DRIVER", "DRIVER_TO_DESTINATION", "FACILITY_TO_PARTNER", "PARTNER_TO_FACILITY", "OTHER"]),
+  facilityId: z.string().min(1),
+  fromActorType: z.enum(["FACILITY", "DRIVER", "PARTNER", "SYSTEM"]),
+  fromActorId: z.string().optional(),
+  toActorType: z.enum(["FACILITY", "DRIVER", "PARTNER", "SYSTEM"]),
+  toActorId: z.string().optional(),
+  expectedItemCount: z.number().int().optional(),
+  sealNumber: z.string().optional(),
+  sealCondition: z.string().optional(),
+  notes: z.string().optional(),
+});
+
+export const acceptHandoverSchema = z.object({
+  acceptedWithException: z.boolean().optional(),
+  actualItemCount: z.number().int().optional(),
+  notes: z.string().optional(),
+});
