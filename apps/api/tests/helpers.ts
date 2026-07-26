@@ -79,3 +79,28 @@ export async function createDriver(
   }
   return res.body;
 }
+
+export async function createTrip(
+  token: string,
+  overrides: Record<string, unknown> = {}
+): Promise<{ id: string; version: number; status: string; [key: string]: unknown }> {
+  const res = await request
+    .post("/api/trips")
+    .set(authed(token))
+    .send({ tripType: "DIRECT_DELIVERY", ...overrides });
+  if (res.status !== 201) {
+    throw new Error(`Failed to create trip: ${res.status} ${JSON.stringify(res.body)}`);
+  }
+  return res.body;
+}
+
+// Seed data always carries at least one vehicle for the tenant; reuse it
+// rather than creating a new one per test since Vehicle has no dedicated
+// test-creation endpoint helper here.
+export async function getVehicleId(token: string): Promise<string> {
+  const res = await request.get("/api/vehicles").set(authed(token));
+  if (res.status !== 200) throw new Error(`Failed to list vehicles: ${res.status}`);
+  const vehicles = Array.isArray(res.body) ? res.body : res.body.vehicles;
+  if (!vehicles?.length) throw new Error("No vehicles found in seed data");
+  return vehicles[0].id;
+}

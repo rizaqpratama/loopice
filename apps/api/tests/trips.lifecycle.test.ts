@@ -41,15 +41,22 @@ describe("trip lifecycle: create -> assign vehicle/driver -> route/manifest -> d
       const withDriver = await request
         .patch(`/api/trips/${trip.id}/driver`)
         .set(authed(token))
-        .send({ primaryDriverId: driver.id, expectedVersion: withVehicle.body.version });
+        .send({ driverId: driver.id, expectedVersion: withVehicle.body.version });
       expect(withDriver.status).toBe(200);
       expect(withDriver.body.primaryDriverId).toBe(driver.id);
 
-      // Transition through statuses
-      const toReady = await request
+      // Transition through statuses (DRAFT -> PLANNING -> READY -> DISPATCHED
+      // -> IN_PROGRESS -> ARRIVED -> COMPLETED, per TRIP_STATUS_TRANSITIONS)
+      const toPlanning = await request
         .patch(`/api/trips/${trip.id}/status`)
         .set(authed(token))
-        .send({ status: "READY", expectedVersion: withDriver.body.version });
+        .send({ status: "PLANNING", expectedVersion: withDriver.body.version });
+      expect(toPlanning.status).toBe(200);
+
+      const toReady = await request
+        .patch(`/api/trips/${toPlanning.body.id}/status`)
+        .set(authed(token))
+        .send({ status: "READY", expectedVersion: toPlanning.body.version });
       expect(toReady.status).toBe(200);
 
       const toDispatched = await request
@@ -58,11 +65,23 @@ describe("trip lifecycle: create -> assign vehicle/driver -> route/manifest -> d
         .send({ status: "DISPATCHED", expectedVersion: toReady.body.version });
       expect(toDispatched.status).toBe(200);
 
-      // Complete trip
-      const completed = await request
+      const toInProgress = await request
         .patch(`/api/trips/${toDispatched.body.id}/status`)
         .set(authed(token))
-        .send({ status: "COMPLETED", expectedVersion: toDispatched.body.version });
+        .send({ status: "IN_PROGRESS", expectedVersion: toDispatched.body.version });
+      expect(toInProgress.status).toBe(200);
+
+      const toArrived = await request
+        .patch(`/api/trips/${toInProgress.body.id}/status`)
+        .set(authed(token))
+        .send({ status: "ARRIVED", expectedVersion: toInProgress.body.version });
+      expect(toArrived.status).toBe(200);
+
+      // Complete trip
+      const completed = await request
+        .patch(`/api/trips/${toArrived.body.id}/status`)
+        .set(authed(token))
+        .send({ status: "COMPLETED", expectedVersion: toArrived.body.version });
       expect(completed.status).toBe(200);
       expect(completed.body.status).toBe("COMPLETED");
 
