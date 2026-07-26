@@ -323,42 +323,47 @@ export async function spawnDiscrepancyTask(
   });
   if (!taskTypeConfig) throw new BadRequestError("Task type not found");
 
-  // Create follow-up exception
-  const exception = await prisma.taskException.create({
-    data: {
-      tenantId,
-      manifestId: reconciliation.manifestId,
-      type: "CARGO_MISSING",
-      severity: "MEDIUM",
-      status: "OPEN",
-      description: `Discrepancy detected for manifest item: ${item.identifier || item.id}`,
-      reportedById: userId ?? undefined,
-    },
-  });
-
-  // Create follow-up task
   const manifest = await prisma.manifest.findUniqueOrThrow({
     where: { id: reconciliation.manifestId },
   });
 
-  const task = await prisma.task.create({
-    data: {
-      tenantId,
-      taskNumber: `TASK-${Date.now()}`,
-      taskTypeId: input.taskTypeId,
-      customerId: manifest.tripId, // Use trip as reference
-      facilityId: reconciliation.destinationFacilityId,
-      status: "UNASSIGNED",
-      priority: "HIGH",
-      notes: `Follow-up for discrepancy: ${item.identifier || item.id}`,
-      createdById: userId ?? undefined,
-    },
-  });
+  const { exception, task } = await prisma.$transaction(async (tx) => {
+    // Create follow-up exception
+    const exception = await tx.taskException.create({
+      data: {
+        tenantId,
+        manifestId: reconciliation.manifestId,
+        type: "CARGO_MISSING",
+        severity: "MEDIUM",
+        status: "OPEN",
+        description: `Discrepancy detected for manifest item: ${item.identifier || item.id}`,
+        reportedById: userId ?? undefined,
+      },
+    });
 
-  // Link exception to task
-  await prisma.taskException.update({
-    where: { id: exception.id },
-    data: { followUpTaskId: task.id },
+    // Create follow-up task. tripId (a real FK to Trip) carries the trip
+    // context -- customerId is FK'd to Customer and must not be set to a
+    // Trip id.
+    const task = await tx.task.create({
+      data: {
+        tenantId,
+        taskNumber: `TASK-${Date.now()}`,
+        taskTypeId: input.taskTypeId,
+        tripId: manifest.tripId,
+        facilityId: reconciliation.destinationFacilityId,
+        status: "UNASSIGNED",
+        priority: "HIGH",
+        notes: `Follow-up for discrepancy: ${item.identifier || item.id}`,
+        createdById: userId ?? undefined,
+      },
+    });
+
+    await tx.taskException.update({
+      where: { id: exception.id },
+      data: { followUpTaskId: task.id },
+    });
+
+    return { exception, task };
   });
 
   domainEvents.emitTyped("manifest.discrepancy_detected", {
