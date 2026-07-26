@@ -7,6 +7,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { domainEvents } from "../../lib/domainEvents";
+import { recordAudit } from "../../lib/auditLog";
 import {
   BadRequestError,
   ConflictError,
@@ -292,17 +293,31 @@ export async function assignVehicle(
     where: { id: vehicleId },
   });
 
-  const updated = await prisma.trip.update({
-    where: { id: tripId },
-    data: {
-      vehicleId,
-      vehicleCapacityKg: vehicle.capacityKg,
-      vehicleCapacityM3: vehicle.capacityM3,
-      vehicleCapacityPallets: vehicle.capacityPallets,
-      version: { increment: 1 },
-      updatedById: userId ?? undefined,
-    },
-    include: TRIP_INCLUDE,
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.update({
+      where: { id: tripId },
+      data: {
+        vehicleId,
+        vehicleCapacityKg: vehicle.capacityKg,
+        vehicleCapacityM3: vehicle.capacityM3,
+        vehicleCapacityPallets: vehicle.capacityPallets,
+        version: { increment: 1 },
+        updatedById: userId ?? undefined,
+      },
+      include: TRIP_INCLUDE,
+    });
+
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "Trip",
+      entityId: tripId,
+      action: "VEHICLE_ASSIGNED",
+      beforeValue: { vehicleId: trip.vehicleId },
+      afterValue: { vehicleId: result.vehicleId },
+      actorId: userId,
+    });
+
+    return result;
   });
 
   domainEvents.emitTyped("trip.vehicle_assigned", {
@@ -361,14 +376,28 @@ export async function assignPrimaryDriver(
 
   await assertDriverAvailable(tenantId, driverId);
 
-  const updated = await prisma.trip.update({
-    where: { id: tripId },
-    data: {
-      primaryDriverId: driverId,
-      version: { increment: 1 },
-      updatedById: userId ?? undefined,
-    },
-    include: TRIP_INCLUDE,
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.update({
+      where: { id: tripId },
+      data: {
+        primaryDriverId: driverId,
+        version: { increment: 1 },
+        updatedById: userId ?? undefined,
+      },
+      include: TRIP_INCLUDE,
+    });
+
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "Trip",
+      entityId: tripId,
+      action: "DRIVER_ASSIGNED",
+      beforeValue: { primaryDriverId: trip.primaryDriverId },
+      afterValue: { primaryDriverId: result.primaryDriverId },
+      actorId: userId,
+    });
+
+    return result;
   });
 
   domainEvents.emitTyped("trip.driver_assigned", {
