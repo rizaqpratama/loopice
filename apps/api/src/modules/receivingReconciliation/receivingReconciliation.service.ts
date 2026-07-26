@@ -223,7 +223,7 @@ export async function completeReconciliation(
   tenantId: string,
   reconciliationId: string,
   userRole?: string,
-  userId?: string
+  userId: string | null = null
 ) {
   const reconciliation = await findScopedReconciliation(tenantId, reconciliationId);
 
@@ -290,10 +290,10 @@ export async function spawnDiscrepancyTask(
   });
   if (!item) throw new NotFoundError("Manifest item not found");
 
-  const taskType = await prisma.taskType.findFirst({
+  const taskTypeConfig = await prisma.taskTypeConfig.findFirst({
     where: { id: input.taskTypeId, tenantId },
   });
-  if (!taskType) throw new BadRequestError("Task type not found");
+  if (!taskTypeConfig) throw new BadRequestError("Task type not found");
 
   // Create follow-up exception
   const exception = await prisma.taskException.create({
@@ -320,7 +320,7 @@ export async function spawnDiscrepancyTask(
       taskTypeId: input.taskTypeId,
       customerId: manifest.tripId, // Use trip as reference
       facilityId: reconciliation.destinationFacilityId,
-      status: "OPEN",
+      status: "UNASSIGNED",
       priority: "HIGH",
       notes: `Follow-up for discrepancy: ${item.identifier || item.id}`,
       createdById: userId ?? undefined,

@@ -550,3 +550,37 @@ export const acceptHandoverSchema = z.object({
   actualItemCount: z.number().int().optional(),
   notes: z.string().optional(),
 });
+
+// -- Receiving & Reconciliation --------------------------------------------------
+
+export const startReconciliationSchema = z.object({
+  tripId: z.string().min(1),
+  manifestId: z.string().min(1),
+  destinationFacilityId: z.string().min(1),
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+export const recordReconciliationCountsSchema = z.object({
+  counts: z.array(
+    z.object({
+      itemId: z.string().min(1),
+      receivedQuantity: z.number().int(),
+      condition: z.string().optional(),
+    })
+  ),
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+export const completeReconciliationSchema = z.object({
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
+
+export const spawnDiscrepancyTaskSchema = z.object({
+  itemId: z.string().min(1),
+  taskTypeId: z.string().min(1),
+  expectedVersion: z.number().int(),
+  clientRequestId: z.string().optional(),
+});
