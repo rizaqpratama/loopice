@@ -626,7 +626,8 @@ export const recordReconciliationCountsSchema = z.object({
     z.object({
       itemId: z.string().min(1),
       receivedQuantity: z.number().int(),
-      condition: z.string().optional(),
+      condition: z.enum(["GOOD", "DAMAGED", "UNIDENTIFIED"]).optional(),
+      conditionNotes: z.string().optional(),
     })
   ),
   expectedVersion: z.number().int(),

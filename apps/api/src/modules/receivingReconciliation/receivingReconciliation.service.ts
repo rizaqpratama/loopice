@@ -110,7 +110,8 @@ export interface RecordReconciliationCountsInput {
   counts: Array<{
     itemId: string;
     receivedQuantity: number;
-    condition?: string;
+    condition?: "GOOD" | "DAMAGED" | "UNIDENTIFIED";
+    conditionNotes?: string;
   }>;
 }
 
@@ -138,19 +139,36 @@ export async function recordReconciliationCounts(
       );
     }
 
-    // Update each item with received quantity
+    // Update each item with received quantity. receivingStatus is derived
+    // from the reported condition first (DAMAGED/UNIDENTIFIED are always
+    // that status regardless of quantity), then from the quantity
+    // comparison otherwise -- previously this unconditionally force-set
+    // RECEIVED, which made DAMAGED/UNIDENTIFIED unreachable through this
+    // endpoint even though recomputeReconciliationStatus below branches on
+    // exactly those statuses.
     for (const count of input.counts) {
       const item = await tx.manifestItem.findFirst({
         where: { id: count.itemId, manifestId: reconciliation.manifestId, tenantId },
       });
       if (!item) throw new NotFoundError(`Manifest item ${count.itemId} not found`);
 
+      const receivingStatus =
+        count.condition === "DAMAGED"
+          ? "DAMAGED"
+          : count.condition === "UNIDENTIFIED"
+            ? "UNIDENTIFIED"
+            : count.receivedQuantity <= 0
+              ? "MISSING"
+              : (item.plannedQuantity ?? 0) > 0 && count.receivedQuantity < (item.plannedQuantity ?? 0)
+                ? "PARTIALLY_RECEIVED"
+                : "RECEIVED";
+
       await tx.manifestItem.update({
         where: { id: count.itemId },
         data: {
           receivedQuantity: count.receivedQuantity,
-          conditionAtReceiving: count.condition,
-          receivingStatus: "RECEIVED",
+          conditionAtReceiving: count.conditionNotes ?? count.condition,
+          receivingStatus,
         },
       });
     }
@@ -194,15 +212,19 @@ async function recomputeReconciliationStatus(
   let unidentifiedCount = 0;
 
   for (const item of items) {
-    const planned = item.plannedQuantity || 0;
+    // Compare against what was actually loaded onto the vehicle when known
+    // -- loading can legitimately differ from the plan -- falling back to
+    // plannedQuantity only for items that never went through the loading
+    // status update (loadedQuantity still null).
+    const baseline = item.loadedQuantity ?? item.plannedQuantity ?? 0;
     const received = item.receivedQuantity || 0;
 
     if (item.receivingStatus === "RECEIVED" || item.receivingStatus === "PARTIALLY_RECEIVED") {
-      if (received === planned) {
+      if (received === baseline) {
         matchedCount++;
-      } else if (received < planned) {
+      } else if (received < baseline) {
         missingCount++;
-      } else if (received > planned) {
+      } else if (received > baseline) {
         excessCount++;
       }
     } else if (item.receivingStatus === "MISSING") {
@@ -240,6 +262,10 @@ export async function completeReconciliation(
 ) {
   const reconciliation = await findScopedReconciliation(tenantId, reconciliationId);
 
+  if (reconciliation.status === "COMPLETED") {
+    throw new BadRequestError("Reconciliation already completed");
+  }
+
   // Check permission: FACILITY_SUPERVISOR+ required for DISCREPANCY status
   if (reconciliation.status === "DISCREPANCY") {
     const allowedRoles = ["TENANT_ADMIN", "OPERATIONS_MANAGER", "FACILITY_SUPERVISOR"];
@@ -249,8 +275,26 @@ export async function completeReconciliation(
   }
 
   await prisma.$transaction(async (tx) => {
+    // Re-check status fresh inside the transaction: the version-gated
+    // update below already prevents an unsafe write if status changed
+    // between the read above and here (a concurrent status flip bumps
+    // version, so a stale expectedVersion fails), but re-reading keeps the
+    // permission decision itself based on current, not stale, data.
+    const fresh = await tx.receivingReconciliation.findUniqueOrThrow({
+      where: { id: reconciliationId },
+    });
+    if (fresh.status === "COMPLETED") {
+      throw new BadRequestError("Reconciliation already completed");
+    }
+    if (fresh.status === "DISCREPANCY") {
+      const allowedRoles = ["TENANT_ADMIN", "OPERATIONS_MANAGER", "FACILITY_SUPERVISOR"];
+      if (!userRole || !allowedRoles.includes(userRole)) {
+        throw new ForbiddenError("Only facility supervisors can approve discrepancies");
+      }
+    }
+
     const result = await tx.receivingReconciliation.updateMany({
-      where: { id: reconciliationId, version: expectedVersion },
+      where: { id: reconciliationId, version: expectedVersion, status: { not: "COMPLETED" } },
       data: {
         status: "COMPLETED",
         completedAt: new Date(),
