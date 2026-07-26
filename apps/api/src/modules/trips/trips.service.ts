@@ -978,11 +978,17 @@ export async function createReplacementTrip(
       });
     }
 
-    // Update parent trip to point to replacement
-    await tx.trip.update({
-      where: { id: parentTripId },
+    // Update parent trip to point to replacement, atomically guarding
+    // against a concurrent request winning the same race -- the earlier
+    // parentTrip.replacementTripId check is a stale unlocked read and
+    // can't prevent two concurrent callers both passing it.
+    const guardResult = await tx.trip.updateMany({
+      where: { id: parentTripId, replacementTripId: null },
       data: { replacementTripId: replacement.id },
     });
+    if (guardResult.count === 0) {
+      throw new ConflictError("Trip already has a replacement trip");
+    }
 
     // Create new route from remaining stops (if parent has an active route)
     if (parentTrip.activeRouteId) {
@@ -1005,8 +1011,10 @@ export async function createReplacementTrip(
           },
         });
 
-        // Copy remaining stops
-        for (const stop of activeRoute.stops) {
+        // Copy remaining stops -- a stop the parent trip already completed
+        // shouldn't be re-planned on the replacement.
+        const remainingStops = activeRoute.stops.filter((s) => s.status !== "COMPLETED");
+        for (const stop of remainingStops) {
           await tx.routeStop.create({
             data: {
               tenantId,
