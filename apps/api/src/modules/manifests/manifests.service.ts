@@ -446,6 +446,12 @@ export async function dispatchTrip(
     throw new BadRequestError(`Trip not ready for dispatch: ${checklist.blockers.join("; ")}`);
   }
 
+  if (trip.activeManifest && !canTransitionManifestStatus(trip.activeManifest.status, "DISPATCHED")) {
+    throw new BadRequestError(
+      `Manifest cannot transition from ${trip.activeManifest.status} to DISPATCHED`
+    );
+  }
+
   const updated = await prisma.$transaction(async (tx) => {
     const dispatchedTrip = await tx.trip.update({
       where: { id: tripId },
