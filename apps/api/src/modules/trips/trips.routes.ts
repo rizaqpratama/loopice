@@ -50,3 +50,7 @@ tripsRoutes.delete("/:id/tasks/:taskId", requireRole([...WRITE_ROLES]), asyncHan
 
 // Dispatch check
 tripsRoutes.get("/:id/dispatch-check", requireRole([...READ_ROLES]), asyncHandler(controller.getDispatchChecklist));
+
+// Pause and resume
+tripsRoutes.patch("/:id/pause", requireRole([...WRITE_ROLES]), asyncHandler(controller.pause));
+tripsRoutes.patch("/:id/resume", requireRole([...WRITE_ROLES]), asyncHandler(controller.resume));

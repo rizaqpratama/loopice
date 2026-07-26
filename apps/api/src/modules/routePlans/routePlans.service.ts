@@ -502,17 +502,45 @@ export async function updateRouteStopStatus(
     throw new BadRequestError(`Cannot transition stop from ${stop.status} to ${newStatus}`);
   }
 
-  const updated = await prisma.routeStop.update({
-    where: { id: stopId },
-    data: {
-      status: newStatus,
-      ...(newStatus === "ARRIVED" && { actualArrivalTime: new Date() }),
-      ...(newStatus === "IN_PROGRESS" && { actualServiceStartTime: new Date() }),
-      ...(newStatus === "COMPLETED" && { actualDepartureTime: new Date() }),
-      updatedAt: new Date(),
-    },
-    include: ROUTE_STOP_INCLUDE,
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.routeStop.update({
+      where: { id: stopId },
+      data: {
+        status: newStatus,
+        ...(newStatus === "ARRIVED" && { actualArrivalTime: new Date() }),
+        ...(newStatus === "IN_PROGRESS" && { actualServiceStartTime: new Date() }),
+        ...(newStatus === "COMPLETED" && { actualDepartureTime: new Date() }),
+        updatedAt: new Date(),
+      },
+      include: ROUTE_STOP_INCLUDE,
+    });
+
+    return result;
   });
+
+  // Emit events based on new status
+  if (newStatus === "ARRIVED") {
+    domainEvents.emitTyped("stop.arrived", {
+      routeStopId: stopId,
+      routeId: stop.routeId,
+      tenantId,
+      sequenceNumber: stop.sequenceNumber,
+    });
+  } else if (newStatus === "COMPLETED") {
+    domainEvents.emitTyped("stop.completed", {
+      routeStopId: stopId,
+      routeId: stop.routeId,
+      tenantId,
+      sequenceNumber: stop.sequenceNumber,
+    });
+  } else if (newStatus === "FAILED") {
+    domainEvents.emitTyped("stop.failed", {
+      routeStopId: stopId,
+      routeId: stop.routeId,
+      tenantId,
+      sequenceNumber: stop.sequenceNumber,
+    });
+  }
 
   return updated;
 }

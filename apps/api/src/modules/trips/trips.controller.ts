@@ -165,3 +165,17 @@ export async function removeTask(req: Request, res: Response) {
 export async function getDispatchChecklist(req: Request, res: Response) {
   res.json(await tripsService.getDispatchChecklist(tenantId(req), req.params.id));
 }
+
+export async function pause(req: Request, res: Response) {
+  const { expectedVersion } = updateTripStatusSchema.parse(req.body);
+  res.json(
+    await tripsService.pauseTrip(tenantId(req), req.params.id, expectedVersion, userId(req))
+  );
+}
+
+export async function resume(req: Request, res: Response) {
+  const { expectedVersion } = updateTripStatusSchema.parse(req.body);
+  res.json(
+    await tripsService.resumeTrip(tenantId(req), req.params.id, expectedVersion, userId(req))
+  );
+}

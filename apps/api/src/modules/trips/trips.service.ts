@@ -675,3 +675,119 @@ export async function getDispatchChecklist(
     blockers,
   };
 }
+
+export async function pauseTrip(
+  tenantId: string,
+  tripId: string,
+  expectedVersion: number,
+  userId: string | null
+) {
+  const trip = await findScoped(tenantId, tripId);
+
+  if (trip.version !== expectedVersion) {
+    throw new ConflictError(
+      `Trip was modified by someone else (expected version ${expectedVersion})`
+    );
+  }
+
+  if (trip.status !== "IN_PROGRESS") {
+    throw new BadRequestError("Trip must be IN_PROGRESS to pause");
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.update({
+      where: { id: tripId },
+      data: {
+        status: "PAUSED",
+        version: { increment: 1 },
+        updatedById: userId ?? undefined,
+      },
+      include: TRIP_INCLUDE,
+    });
+
+    await tx.tripStatusHistory.create({
+      data: {
+        tripId,
+        status: "PAUSED",
+        changedById: userId ?? undefined,
+      },
+    });
+
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "Trip",
+      entityId: tripId,
+      action: "TRIP_PAUSED",
+      beforeValue: { status: trip.status },
+      afterValue: { status: "PAUSED" },
+      actorId: userId,
+    });
+
+    return result;
+  });
+
+  domainEvents.emitTyped("trip.paused", {
+    tripId,
+    tenantId,
+  });
+
+  return updated;
+}
+
+export async function resumeTrip(
+  tenantId: string,
+  tripId: string,
+  expectedVersion: number,
+  userId: string | null
+) {
+  const trip = await findScoped(tenantId, tripId);
+
+  if (trip.version !== expectedVersion) {
+    throw new ConflictError(
+      `Trip was modified by someone else (expected version ${expectedVersion})`
+    );
+  }
+
+  if (trip.status !== "PAUSED") {
+    throw new BadRequestError("Trip must be PAUSED to resume");
+  }
+
+  const updated = await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.update({
+      where: { id: tripId },
+      data: {
+        status: "IN_PROGRESS",
+        version: { increment: 1 },
+        updatedById: userId ?? undefined,
+      },
+      include: TRIP_INCLUDE,
+    });
+
+    await tx.tripStatusHistory.create({
+      data: {
+        tripId,
+        status: "IN_PROGRESS",
+        changedById: userId ?? undefined,
+      },
+    });
+
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "Trip",
+      entityId: tripId,
+      action: "TRIP_RESUMED",
+      beforeValue: { status: trip.status },
+      afterValue: { status: "IN_PROGRESS" },
+      actorId: userId,
+    });
+
+    return result;
+  });
+
+  domainEvents.emitTyped("trip.resumed", {
+    tripId,
+    tenantId,
+  });
+
+  return updated;
+}
