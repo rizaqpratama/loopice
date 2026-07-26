@@ -16,6 +16,7 @@ import {
 } from "../../lib/httpError";
 import { SAFE_USER_SELECT } from "../../lib/safeUserSelect";
 import type { UserRole } from "@loopice/shared";
+import { linkTaskToRouteStop, unlinkTaskFromRouteStop } from "../tasks/routeStopLinking";
 
 const TRIP_INCLUDE = {
   vehicle: true,
@@ -577,30 +578,38 @@ export async function addTaskToTrip(
     throw new BadRequestError("Task is already assigned to another trip");
   }
 
-  const updated = await prisma.trip.update({
-    where: { id: tripId },
-    data: {
-      tasks: { connect: { id: taskId } },
-    },
-    include: TRIP_INCLUDE,
-  });
-
+  let routeStop: { id: string; routeId: string } | null = null;
   if (stopId) {
-    const routeStop = await prisma.routeStop.findFirst({
+    routeStop = await prisma.routeStop.findFirst({
       where: { id: stopId, route: { tripId } },
+      select: { id: true, routeId: true },
     });
+  }
+
+  await prisma.$transaction(async (tx) => {
     if (routeStop) {
-      await prisma.routeStopTask.create({
-        data: {
+      try {
+        await linkTaskToRouteStop(tx, {
           tenantId,
-          routeStopId: stopId,
           taskId,
-          assignmentStatus: "ASSIGNED",
-          createdById: userId ?? undefined,
-        },
+          routeStopId: routeStop.id,
+          tripId,
+          routeId: routeStop.routeId,
+          userId,
+        });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+          throw new BadRequestError("Task is already linked to another stop");
+        }
+        throw err;
+      }
+    } else {
+      await tx.task.update({
+        where: { id: taskId },
+        data: { tripId },
       });
     }
-  }
+  });
 
   domainEvents.emitTyped("trip.task_added", {
     tripId,
@@ -625,17 +634,11 @@ export async function removeTaskFromTrip(
   if (!task) throw new NotFoundError("Task not found on this trip");
 
   await prisma.$transaction(async (tx) => {
-    await tx.routeStopTask.deleteMany({
-      where: { taskId, routeStop: { route: { tripId } } },
-    });
-
-    await tx.task.update({
-      where: { id: taskId },
-      data: {
-        tripId: null,
-        routeId: null,
-        stopId: null,
-      },
+    await unlinkTaskFromRouteStop(tx, {
+      tenantId,
+      taskId,
+      removalReason: "Removed from trip",
+      clearTripAssignment: true,
     });
   });
 

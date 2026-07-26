@@ -11,6 +11,7 @@ import { prisma } from "../../db/prisma";
 import { domainEvents } from "../../lib/domainEvents";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/httpError";
 import { SAFE_USER_SELECT } from "../../lib/safeUserSelect";
+import { linkTaskToRouteStop, unlinkTaskFromRouteStop } from "./routeStopLinking";
 
 const TASK_INCLUDE = {
   taskType: true,
@@ -882,9 +883,13 @@ export async function assignTask(
         assignedStaffId: input.assignedStaffId,
         assignedTeamId: input.assignedTeamId,
         assignedPartnerId: input.assignedPartnerId,
-        tripId: input.tripId,
-        routeId: input.routeId,
-        stopId: input.stopId,
+        // When a stopId is given, linkTaskToRouteStop below owns writing
+        // tripId/routeId/stopId (and the matching RouteStopTask row) so the
+        // two never drift. Otherwise (trip-only or no trip/stop context)
+        // set them directly here as before.
+        ...(input.stopId
+          ? {}
+          : { tripId: input.tripId, routeId: input.routeId, stopId: input.stopId }),
         version: { increment: 1 },
         updatedById: actorId ?? undefined,
       },
@@ -902,6 +907,25 @@ export async function assignTask(
         clientRequestId,
       },
     });
+
+    if (input.stopId) {
+      try {
+        await linkTaskToRouteStop(tx, {
+          tenantId,
+          taskId: id,
+          routeStopId: input.stopId,
+          tripId: input.tripId,
+          routeId: input.routeId,
+          userId: actorId,
+        });
+      } catch (err) {
+        if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+          throw new BadRequestError("Task is already linked to another stop");
+        }
+        throw err;
+      }
+    }
+
     return tx.task.findUniqueOrThrow({ where: { id }, include: TASK_INCLUDE });
   });
   domainEvents.emitTyped("task.assigned", {
@@ -948,6 +972,26 @@ export async function unassignTask(
     await tx.taskStatusHistory.create({
       data: { taskId: id, status: "UNASSIGNED", changedById: actorId ?? undefined, clientRequestId },
     });
+
+    if (task.stopId) {
+      await unlinkTaskFromRouteStop(tx, {
+        tenantId,
+        taskId: id,
+        routeStopId: task.stopId,
+        removalReason: "Task unassigned",
+        clearTripAssignment: true,
+      });
+    } else if (task.tripId || task.routeId) {
+      // No stop link, but trip/route context was set directly (e.g. a
+      // trip-only assignment) -- clear it the same way linkTaskToRouteStop
+      // would have, since unassignment must never leave a stale trip/route
+      // pointer on an UNASSIGNED task.
+      await tx.task.update({
+        where: { id },
+        data: { tripId: null, routeId: null, stopId: null },
+      });
+    }
+
     return tx.task.findUniqueOrThrow({ where: { id }, include: TASK_INCLUDE });
   });
   domainEvents.emitTyped("task.unassigned", { taskId: id, tenantId });

@@ -11,6 +11,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { domainEvents } from "../../lib/domainEvents";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/httpError";
+import { linkTaskToRouteStop, unlinkTaskFromRouteStop } from "../tasks/routeStopLinking";
 
 const ROUTE_INCLUDE = {
   stops: { orderBy: { sequenceNumber: "asc" } },
@@ -467,21 +468,12 @@ export async function addRouteStop(
         where: { id: input.sourceTaskId, tenantId },
       });
       if (task) {
-        await tx.routeStopTask.create({
-          data: {
-            tenantId,
-            routeStopId: stop.id,
-            taskId: input.sourceTaskId,
-            assignmentStatus: "ASSIGNED",
-            createdById: userId ?? undefined,
-          },
-        });
-
-        await tx.task.update({
-          where: { id: input.sourceTaskId },
-          data: {
-            stopId: stop.id,
-          },
+        await linkTaskToRouteStop(tx, {
+          tenantId,
+          taskId: input.sourceTaskId,
+          routeStopId: stop.id,
+          routeId,
+          userId,
         });
       }
     }
@@ -681,6 +673,16 @@ export async function deleteRouteStop(
       );
     }
 
+    // The RouteStop row itself is being deleted, so RouteStopTask rows
+    // pointing at it can't be soft-removed (their FK would be left
+    // dangling) -- they're hard-deleted here, the one legitimate exception
+    // to the soft-removal rule. Any tasks linked to this stop still need
+    // their stopId cleared so they don't keep pointing at a deleted stop.
+    await tx.task.updateMany({
+      where: { tenantId, stopId },
+      data: { stopId: null },
+    });
+
     await tx.routeStopTask.deleteMany({
       where: { routeStopId: stopId },
     });
@@ -719,18 +721,6 @@ export async function linkTaskToStop(
 
   if (!task) throw new NotFoundError("Task not found");
 
-  const existingLink = await prisma.routeStopTask.findFirst({
-    where: {
-      tenantId,
-      taskId,
-      assignmentStatus: { in: ["PLANNED", "ASSIGNED"] as RouteStopTaskAssignmentStatus[] },
-    },
-  });
-
-  if (existingLink) {
-    throw new BadRequestError("Task is already linked to another stop");
-  }
-
   const created = await prisma.$transaction(async (tx) => {
     const versionResult = await tx.route.updateMany({
       where: { id: stop.routeId, version: expectedVersion },
@@ -742,26 +732,20 @@ export async function linkTaskToStop(
       );
     }
 
-    const link = await tx.routeStopTask.create({
-      data: {
+    try {
+      return await linkTaskToRouteStop(tx, {
         tenantId,
-        routeStopId: stopId,
         taskId,
-        assignmentStatus: "ASSIGNED",
-        assignedAt: new Date(),
-        createdById: userId ?? undefined,
-      },
-      include: { task: true },
-    });
-
-    await tx.task.update({
-      where: { id: taskId },
-      data: {
-        stopId,
-      },
-    });
-
-    return link;
+        routeStopId: stopId,
+        routeId: stop.routeId,
+        userId,
+      });
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        throw new BadRequestError("Task is already linked to another stop");
+      }
+      throw err;
+    }
   });
 
   return created;
@@ -779,6 +763,7 @@ export async function unlinkTaskFromStop(
     where: {
       routeStopId: stopId,
       taskId,
+      assignmentStatus: { in: ["PLANNED", "ASSIGNED"] as RouteStopTaskAssignmentStatus[] },
     },
   });
 
@@ -795,15 +780,11 @@ export async function unlinkTaskFromStop(
       );
     }
 
-    await tx.routeStopTask.delete({
-      where: { id: link.id },
-    });
-
-    await tx.task.update({
-      where: { id: taskId },
-      data: {
-        stopId: null,
-      },
+    await unlinkTaskFromRouteStop(tx, {
+      tenantId,
+      taskId,
+      routeStopId: stopId,
+      removalReason: "Unlinked from stop",
     });
   });
 
