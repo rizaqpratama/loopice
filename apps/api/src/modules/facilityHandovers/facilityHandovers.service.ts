@@ -70,6 +70,7 @@ export async function createHandover(
       sealCondition: input.sealCondition,
       notes: input.notes,
       createdById: userId ?? undefined,
+      version: 1,
     },
     include: HANDOVER_INCLUDE,
   });
@@ -114,6 +115,7 @@ export async function acceptHandover(
   tenantId: string,
   handoverId: string,
   input: AcceptHandoverInput,
+  expectedVersion: number,
   userRole?: string,
   userId?: string
 ) {
@@ -133,16 +135,25 @@ export async function acceptHandover(
     }
   }
 
-  const updated = await prisma.facilityHandover.update({
-    where: { id: handoverId },
-    data: {
-      status: input.acceptedWithException ? "ACCEPTED_WITH_EXCEPTION" : "ACCEPTED",
-      actualItemCount: input.actualItemCount,
-      notes: input.notes,
-      acceptedTime: new Date(),
-    },
-    include: HANDOVER_INCLUDE,
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.facilityHandover.updateMany({
+      where: { id: handoverId, version: expectedVersion },
+      data: {
+        status: input.acceptedWithException ? "ACCEPTED_WITH_EXCEPTION" : "ACCEPTED",
+        actualItemCount: input.actualItemCount,
+        notes: input.notes,
+        acceptedTime: new Date(),
+        version: { increment: 1 },
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Handover was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
   });
+
+  const updated = await findScopedHandover(tenantId, handoverId);
 
   const eventType = handover.handoverType === "ORIGIN_TO_DRIVER"
     ? "handover.origin_accepted"
@@ -163,6 +174,7 @@ export async function acceptHandover(
 export async function rejectHandover(
   tenantId: string,
   handoverId: string,
+  expectedVersion: number,
   userId: string | null
 ) {
   const handover = await findScopedHandover(tenantId, handoverId);
@@ -171,13 +183,20 @@ export async function rejectHandover(
     throw new BadRequestError("Handover must be in PENDING status to reject");
   }
 
-  const updated = await prisma.facilityHandover.update({
-    where: { id: handoverId },
-    data: {
-      status: "REJECTED",
-    },
-    include: HANDOVER_INCLUDE,
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.facilityHandover.updateMany({
+      where: { id: handoverId, version: expectedVersion },
+      data: {
+        status: "REJECTED",
+        version: { increment: 1 },
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Handover was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
   });
 
-  return updated;
+  return findScopedHandover(tenantId, handoverId);
 }

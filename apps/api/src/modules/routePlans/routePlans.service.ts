@@ -150,31 +150,30 @@ export async function updateRoute(
   expectedVersion: number,
   userId: string | null
 ) {
-  const route = await findScopedRoute(tenantId, id);
+  await findScopedRoute(tenantId, id);
 
-  if (route.version !== expectedVersion) {
-    throw new ConflictError(
-      `Route was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
-
-  const updated = await prisma.route.update({
-    where: { id },
+  const result = await prisma.route.updateMany({
+    where: { id, version: expectedVersion },
     data: {
       ...input,
       version: { increment: 1 },
       updatedById: userId ?? undefined,
     },
-    include: ROUTE_INCLUDE,
   });
+  if (result.count === 0) {
+    throw new ConflictError(
+      `Route was modified by someone else (expected version ${expectedVersion})`
+    );
+  }
 
-  return updated;
+  return findScopedRoute(tenantId, id);
 }
 
 export async function updateRouteStatus(
   tenantId: string,
   id: string,
   newStatus: RouteStatus,
+  expectedVersion: number,
   userId: string | null
 ) {
   const route = await findScopedRoute(tenantId, id);
@@ -183,14 +182,21 @@ export async function updateRouteStatus(
     throw new BadRequestError(`Cannot transition route from ${route.status} to ${newStatus}`);
   }
 
-  const updated = await prisma.route.update({
-    where: { id },
+  const result = await prisma.route.updateMany({
+    where: { id, version: expectedVersion },
     data: {
       status: newStatus,
+      version: { increment: 1 },
       updatedById: userId ?? undefined,
     },
-    include: ROUTE_INCLUDE,
   });
+  if (result.count === 0) {
+    throw new ConflictError(
+      `Route was modified by someone else (expected version ${expectedVersion})`
+    );
+  }
+
+  const updated = await findScopedRoute(tenantId, id);
 
   if (newStatus === "ACTIVE" && route.tripId) {
     domainEvents.emitTyped("route.activated", {
@@ -340,6 +346,7 @@ export async function addRouteStop(
   tenantId: string,
   routeId: string,
   input: CreateRouteStopInput,
+  expectedVersion: number,
   userId: string | null
 ) {
   const route = await findScopedRoute(tenantId, routeId);
@@ -351,79 +358,93 @@ export async function addRouteStop(
     if (!facility) throw new BadRequestError("Facility not found");
   }
 
-  const existingStopAtSequence = await prisma.routeStop.findFirst({
-    where: {
-      routeId,
-      sequenceNumber: input.sequenceNumber,
-    },
-  });
+  const created = await prisma.$transaction(async (tx) => {
+    const versionResult = await tx.route.updateMany({
+      where: { id: routeId, version: expectedVersion },
+      data: { version: { increment: 1 }, updatedById: userId ?? undefined },
+    });
+    if (versionResult.count === 0) {
+      throw new ConflictError(
+        `Route was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
 
-  if (existingStopAtSequence) {
-    await prisma.routeStop.updateMany({
+    const existingStopAtSequence = await tx.routeStop.findFirst({
       where: {
         routeId,
-        sequenceNumber: { gte: input.sequenceNumber },
-      },
-      data: {
-        sequenceNumber: { increment: 1 },
+        sequenceNumber: input.sequenceNumber,
       },
     });
-  }
 
-  const created = await prisma.routeStop.create({
-    data: {
-      tenantId,
-      routeId,
-      stopType: input.stopType ?? "OTHER",
-      sequenceNumber: input.sequenceNumber,
-      isMandatory: input.isMandatory ?? true,
-      status: "PLANNED",
-      facilityId: input.facilityId,
-      locationName: input.locationName,
-      address: input.address,
-      latitude: input.latitude,
-      longitude: input.longitude,
-      contactName: input.contactName,
-      contactPhone: input.contactPhone,
-      plannedArrivalTime: input.plannedArrivalTime
-        ? new Date(input.plannedArrivalTime)
-        : undefined,
-      plannedDepartureTime: input.plannedDepartureTime
-        ? new Date(input.plannedDepartureTime)
-        : undefined,
-      estimatedServiceDurationMinutes: input.estimatedServiceDurationMinutes,
-      timeWindowStart: input.timeWindowStart ? new Date(input.timeWindowStart) : undefined,
-      timeWindowEnd: input.timeWindowEnd ? new Date(input.timeWindowEnd) : undefined,
-      accessNotes: input.accessNotes,
-      instructions: input.instructions,
-      notes: input.notes,
-    },
-    include: ROUTE_STOP_INCLUDE,
-  });
-
-  if (input.sourceTaskId) {
-    const task = await prisma.task.findFirst({
-      where: { id: input.sourceTaskId, tenantId },
-    });
-    if (task) {
-      await prisma.routeStopTask.create({
-        data: {
-          tenantId,
-          routeStopId: created.id,
-          taskId: input.sourceTaskId,
-          assignmentStatus: "ASSIGNED",
-          createdById: userId ?? undefined,
+    if (existingStopAtSequence) {
+      await tx.routeStop.updateMany({
+        where: {
+          routeId,
+          sequenceNumber: { gte: input.sequenceNumber },
         },
-      });
-
-      await prisma.task.update({
-        where: { id: input.sourceTaskId },
         data: {
-          stopId: created.id,
+          sequenceNumber: { increment: 1 },
         },
       });
     }
-  }
+
+    const stop = await tx.routeStop.create({
+      data: {
+        tenantId,
+        routeId,
+        stopType: input.stopType ?? "OTHER",
+        sequenceNumber: input.sequenceNumber,
+        isMandatory: input.isMandatory ?? true,
+        status: "PLANNED",
+        facilityId: input.facilityId,
+        locationName: input.locationName,
+        address: input.address,
+        latitude: input.latitude,
+        longitude: input.longitude,
+        contactName: input.contactName,
+        contactPhone: input.contactPhone,
+        plannedArrivalTime: input.plannedArrivalTime
+          ? new Date(input.plannedArrivalTime)
+          : undefined,
+        plannedDepartureTime: input.plannedDepartureTime
+          ? new Date(input.plannedDepartureTime)
+          : undefined,
+        estimatedServiceDurationMinutes: input.estimatedServiceDurationMinutes,
+        timeWindowStart: input.timeWindowStart ? new Date(input.timeWindowStart) : undefined,
+        timeWindowEnd: input.timeWindowEnd ? new Date(input.timeWindowEnd) : undefined,
+        accessNotes: input.accessNotes,
+        instructions: input.instructions,
+        notes: input.notes,
+      },
+      include: ROUTE_STOP_INCLUDE,
+    });
+
+    if (input.sourceTaskId) {
+      const task = await tx.task.findFirst({
+        where: { id: input.sourceTaskId, tenantId },
+      });
+      if (task) {
+        await tx.routeStopTask.create({
+          data: {
+            tenantId,
+            routeStopId: stop.id,
+            taskId: input.sourceTaskId,
+            assignmentStatus: "ASSIGNED",
+            createdById: userId ?? undefined,
+          },
+        });
+
+        await tx.task.update({
+          where: { id: input.sourceTaskId },
+          data: {
+            stopId: stop.id,
+          },
+        });
+      }
+    }
+
+    return stop;
+  });
 
   return created;
 }
@@ -455,39 +476,51 @@ export async function updateRouteStop(
   tenantId: string,
   stopId: string,
   input: UpdateRouteStopInput,
+  expectedVersion: number,
   userId: string | null
 ) {
-  await findScopedStop(tenantId, stopId);
+  const stop = await findScopedStop(tenantId, stopId);
 
-  const updated = await prisma.routeStop.update({
-    where: { id: stopId },
-    data: {
-      stopType: input.stopType,
-      locationName: input.locationName,
-      address: input.address,
-      latitude: input.latitude,
-      longitude: input.longitude,
-      contactName: input.contactName,
-      contactPhone: input.contactPhone,
-      plannedArrivalTime: input.plannedArrivalTime
-        ? new Date(input.plannedArrivalTime)
-        : undefined,
-      plannedDepartureTime: input.plannedDepartureTime
-        ? new Date(input.plannedDepartureTime)
-        : undefined,
-      estimatedServiceDurationMinutes: input.estimatedServiceDurationMinutes,
-      timeWindowStart: input.timeWindowStart ? new Date(input.timeWindowStart) : undefined,
-      timeWindowEnd: input.timeWindowEnd ? new Date(input.timeWindowEnd) : undefined,
-      accessNotes: input.accessNotes,
-      instructions: input.instructions,
-      notes: input.notes,
-      isMandatory: input.isMandatory,
-      updatedAt: new Date(),
-    },
-    include: ROUTE_STOP_INCLUDE,
+  await prisma.$transaction(async (tx) => {
+    const versionResult = await tx.route.updateMany({
+      where: { id: stop.routeId, version: expectedVersion },
+      data: { version: { increment: 1 }, updatedById: userId ?? undefined },
+    });
+    if (versionResult.count === 0) {
+      throw new ConflictError(
+        `Route was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
+
+    await tx.routeStop.update({
+      where: { id: stopId },
+      data: {
+        stopType: input.stopType,
+        locationName: input.locationName,
+        address: input.address,
+        latitude: input.latitude,
+        longitude: input.longitude,
+        contactName: input.contactName,
+        contactPhone: input.contactPhone,
+        plannedArrivalTime: input.plannedArrivalTime
+          ? new Date(input.plannedArrivalTime)
+          : undefined,
+        plannedDepartureTime: input.plannedDepartureTime
+          ? new Date(input.plannedDepartureTime)
+          : undefined,
+        estimatedServiceDurationMinutes: input.estimatedServiceDurationMinutes,
+        timeWindowStart: input.timeWindowStart ? new Date(input.timeWindowStart) : undefined,
+        timeWindowEnd: input.timeWindowEnd ? new Date(input.timeWindowEnd) : undefined,
+        accessNotes: input.accessNotes,
+        instructions: input.instructions,
+        notes: input.notes,
+        isMandatory: input.isMandatory,
+        updatedAt: new Date(),
+      },
+    });
   });
 
-  return updated;
+  return findScopedStop(tenantId, stopId);
 }
 
 export async function updateRouteStopStatus(
@@ -585,11 +618,26 @@ export async function reorderRouteStops(
   return findScopedRoute(tenantId, routeId);
 }
 
-export async function deleteRouteStop(tenantId: string, stopId: string, userId: string | null) {
+export async function deleteRouteStop(
+  tenantId: string,
+  stopId: string,
+  expectedVersion: number,
+  userId: string | null
+) {
   const stop = await findScopedStop(tenantId, stopId);
   const routeId = stop.routeId;
 
   await prisma.$transaction(async (tx) => {
+    const versionResult = await tx.route.updateMany({
+      where: { id: routeId, version: expectedVersion },
+      data: { version: { increment: 1 }, updatedById: userId ?? undefined },
+    });
+    if (versionResult.count === 0) {
+      throw new ConflictError(
+        `Route was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
+
     await tx.routeStopTask.deleteMany({
       where: { routeStopId: stopId },
     });
@@ -618,6 +666,7 @@ export async function linkTaskToStop(
   tenantId: string,
   stopId: string,
   taskId: string,
+  expectedVersion: number,
   userId: string | null
 ) {
   const stop = await findScopedStop(tenantId, stopId);
@@ -629,6 +678,7 @@ export async function linkTaskToStop(
 
   const existingLink = await prisma.routeStopTask.findFirst({
     where: {
+      tenantId,
       taskId,
       assignmentStatus: { in: ["PLANNED", "ASSIGNED"] as RouteStopTaskAssignmentStatus[] },
     },
@@ -638,23 +688,37 @@ export async function linkTaskToStop(
     throw new BadRequestError("Task is already linked to another stop");
   }
 
-  const created = await prisma.routeStopTask.create({
-    data: {
-      tenantId,
-      routeStopId: stopId,
-      taskId,
-      assignmentStatus: "ASSIGNED",
-      assignedAt: new Date(),
-      createdById: userId ?? undefined,
-    },
-    include: { task: true },
-  });
+  const created = await prisma.$transaction(async (tx) => {
+    const versionResult = await tx.route.updateMany({
+      where: { id: stop.routeId, version: expectedVersion },
+      data: { version: { increment: 1 }, updatedById: userId ?? undefined },
+    });
+    if (versionResult.count === 0) {
+      throw new ConflictError(
+        `Route was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
 
-  await prisma.task.update({
-    where: { id: taskId },
-    data: {
-      stopId,
-    },
+    const link = await tx.routeStopTask.create({
+      data: {
+        tenantId,
+        routeStopId: stopId,
+        taskId,
+        assignmentStatus: "ASSIGNED",
+        assignedAt: new Date(),
+        createdById: userId ?? undefined,
+      },
+      include: { task: true },
+    });
+
+    await tx.task.update({
+      where: { id: taskId },
+      data: {
+        stopId,
+      },
+    });
+
+    return link;
   });
 
   return created;
@@ -664,8 +728,10 @@ export async function unlinkTaskFromStop(
   tenantId: string,
   stopId: string,
   taskId: string,
+  expectedVersion: number,
   userId: string | null
 ) {
+  const stop = await findScopedStop(tenantId, stopId);
   const link = await prisma.routeStopTask.findFirst({
     where: {
       routeStopId: stopId,
@@ -675,15 +741,27 @@ export async function unlinkTaskFromStop(
 
   if (!link) throw new NotFoundError("Task is not linked to this stop");
 
-  await prisma.routeStopTask.delete({
-    where: { id: link.id },
-  });
+  await prisma.$transaction(async (tx) => {
+    const versionResult = await tx.route.updateMany({
+      where: { id: stop.routeId, version: expectedVersion },
+      data: { version: { increment: 1 }, updatedById: userId ?? undefined },
+    });
+    if (versionResult.count === 0) {
+      throw new ConflictError(
+        `Route was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
 
-  await prisma.task.update({
-    where: { id: taskId },
-    data: {
-      stopId: null,
-    },
+    await tx.routeStopTask.delete({
+      where: { id: link.id },
+    });
+
+    await tx.task.update({
+      where: { id: taskId },
+      data: {
+        stopId: null,
+      },
+    });
   });
 
   return findScopedStop(tenantId, stopId);

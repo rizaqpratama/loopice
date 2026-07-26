@@ -245,27 +245,29 @@ export async function updateTrip(
   expectedVersion: number,
   userId: string | null
 ) {
-  const trip = await findScoped(tenantId, id);
+  await findScoped(tenantId, id);
 
-  if (trip.version !== expectedVersion) {
-    throw new ConflictError(
-      `Trip was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
-
-  const updated = await prisma.trip.update({
-    where: { id },
-    data: {
-      serviceDate: input.serviceDate ? new Date(input.serviceDate) : undefined,
-      plannedStartTime: input.plannedStartTime ? new Date(input.plannedStartTime) : undefined,
-      plannedEndTime: input.plannedEndTime ? new Date(input.plannedEndTime) : undefined,
-      instructions: input.instructions,
-      notes: input.notes,
-      version: { increment: 1 },
-      updatedById: userId ?? undefined,
-    },
-    include: TRIP_INCLUDE,
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.updateMany({
+      where: { id, version: expectedVersion },
+      data: {
+        serviceDate: input.serviceDate ? new Date(input.serviceDate) : undefined,
+        plannedStartTime: input.plannedStartTime ? new Date(input.plannedStartTime) : undefined,
+        plannedEndTime: input.plannedEndTime ? new Date(input.plannedEndTime) : undefined,
+        instructions: input.instructions,
+        notes: input.notes,
+        version: { increment: 1 },
+        updatedById: userId ?? undefined,
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Trip was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
   });
+
+  const updated = await findScoped(tenantId, id);
 
   domainEvents.emitTyped("trip.updated", { tripId: id, tenantId });
 
@@ -281,21 +283,15 @@ export async function assignVehicle(
 ) {
   const trip = await findScoped(tenantId, tripId);
 
-  if (trip.version !== expectedVersion) {
-    throw new ConflictError(
-      `Trip was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
-
   await assertVehicleAvailable(tenantId, vehicleId);
 
   const vehicle = await prisma.vehicle.findUniqueOrThrow({
     where: { id: vehicleId },
   });
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const result = await tx.trip.update({
-      where: { id: tripId },
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.updateMany({
+      where: { id: tripId, version: expectedVersion },
       data: {
         vehicleId,
         vehicleCapacityKg: vehicle.capacityKg,
@@ -304,8 +300,12 @@ export async function assignVehicle(
         version: { increment: 1 },
         updatedById: userId ?? undefined,
       },
-      include: TRIP_INCLUDE,
     });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Trip was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
 
     await recordAudit(tx, {
       tenantId,
@@ -313,12 +313,12 @@ export async function assignVehicle(
       entityId: tripId,
       action: "VEHICLE_ASSIGNED",
       beforeValue: { vehicleId: trip.vehicleId },
-      afterValue: { vehicleId: result.vehicleId },
+      afterValue: { vehicleId },
       actorId: userId,
     });
-
-    return result;
   });
+
+  const updated = await findScoped(tenantId, tripId);
 
   domainEvents.emitTyped("trip.vehicle_assigned", {
     tripId,
@@ -335,28 +335,28 @@ export async function unassignVehicle(
   expectedVersion: number,
   userId: string | null
 ) {
-  const trip = await findScoped(tenantId, tripId);
+  await findScoped(tenantId, tripId);
 
-  if (trip.version !== expectedVersion) {
-    throw new ConflictError(
-      `Trip was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
-
-  const updated = await prisma.trip.update({
-    where: { id: tripId },
-    data: {
-      vehicleId: null,
-      vehicleCapacityKg: null,
-      vehicleCapacityM3: null,
-      vehicleCapacityPallets: null,
-      version: { increment: 1 },
-      updatedById: userId ?? undefined,
-    },
-    include: TRIP_INCLUDE,
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.updateMany({
+      where: { id: tripId, version: expectedVersion },
+      data: {
+        vehicleId: null,
+        vehicleCapacityKg: null,
+        vehicleCapacityM3: null,
+        vehicleCapacityPallets: null,
+        version: { increment: 1 },
+        updatedById: userId ?? undefined,
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Trip was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
   });
 
-  return updated;
+  return findScoped(tenantId, tripId);
 }
 
 export async function assignPrimaryDriver(
@@ -368,24 +368,22 @@ export async function assignPrimaryDriver(
 ) {
   const trip = await findScoped(tenantId, tripId);
 
-  if (trip.version !== expectedVersion) {
-    throw new ConflictError(
-      `Trip was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
-
   await assertDriverAvailable(tenantId, driverId);
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const result = await tx.trip.update({
-      where: { id: tripId },
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.updateMany({
+      where: { id: tripId, version: expectedVersion },
       data: {
         primaryDriverId: driverId,
         version: { increment: 1 },
         updatedById: userId ?? undefined,
       },
-      include: TRIP_INCLUDE,
     });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Trip was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
 
     await recordAudit(tx, {
       tenantId,
@@ -393,12 +391,12 @@ export async function assignPrimaryDriver(
       entityId: tripId,
       action: "DRIVER_ASSIGNED",
       beforeValue: { primaryDriverId: trip.primaryDriverId },
-      afterValue: { primaryDriverId: result.primaryDriverId },
+      afterValue: { primaryDriverId: driverId },
       actorId: userId,
     });
-
-    return result;
   });
+
+  const updated = await findScoped(tenantId, tripId);
 
   domainEvents.emitTyped("trip.driver_assigned", {
     tripId,
@@ -416,42 +414,50 @@ export async function unassignPrimaryDriver(
   expectedVersion: number,
   userId: string | null
 ) {
-  const trip = await findScoped(tenantId, tripId);
+  await findScoped(tenantId, tripId);
 
-  if (trip.version !== expectedVersion) {
-    throw new ConflictError(
-      `Trip was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
-
-  const updated = await prisma.trip.update({
-    where: { id: tripId },
-    data: {
-      primaryDriverId: null,
-      version: { increment: 1 },
-      updatedById: userId ?? undefined,
-    },
-    include: TRIP_INCLUDE,
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.updateMany({
+      where: { id: tripId, version: expectedVersion },
+      data: {
+        primaryDriverId: null,
+        version: { increment: 1 },
+        updatedById: userId ?? undefined,
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Trip was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
   });
 
-  return updated;
+  return findScoped(tenantId, tripId);
 }
 
 export async function addSecondaryDriver(
   tenantId: string,
   tripId: string,
   driverId: string,
+  expectedVersion: number,
   userId: string | null
 ) {
-  const trip = await findScoped(tenantId, tripId);
+  await findScoped(tenantId, tripId);
   await assertDriverAvailable(tenantId, driverId);
 
-  const secondaryDriver = await prisma.tripSecondaryDriver.create({
-    data: {
-      tripId,
-      driverId,
-    },
-    include: { driver: true },
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.updateMany({
+      where: { id: tripId, version: expectedVersion },
+      data: { version: { increment: 1 }, updatedById: userId ?? undefined },
+    });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Trip was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
+    await tx.tripSecondaryDriver.create({
+      data: { tripId, driverId },
+    });
   });
 
   return findScoped(tenantId, tripId);
@@ -461,12 +467,24 @@ export async function removeSecondaryDriver(
   tenantId: string,
   tripId: string,
   driverId: string,
+  expectedVersion: number,
   userId: string | null
 ) {
-  const trip = await findScoped(tenantId, tripId);
+  await findScoped(tenantId, tripId);
 
-  await prisma.tripSecondaryDriver.delete({
-    where: { tripId_driverId: { tripId, driverId } },
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.updateMany({
+      where: { id: tripId, version: expectedVersion },
+      data: { version: { increment: 1 }, updatedById: userId ?? undefined },
+    });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Trip was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
+    await tx.tripSecondaryDriver.delete({
+      where: { tripId_driverId: { tripId, driverId } },
+    });
   });
 
   return findScoped(tenantId, tripId);
@@ -684,26 +702,24 @@ export async function pauseTrip(
 ) {
   const trip = await findScoped(tenantId, tripId);
 
-  if (trip.version !== expectedVersion) {
-    throw new ConflictError(
-      `Trip was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
-
   if (trip.status !== "IN_PROGRESS") {
     throw new BadRequestError("Trip must be IN_PROGRESS to pause");
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const result = await tx.trip.update({
-      where: { id: tripId },
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.updateMany({
+      where: { id: tripId, version: expectedVersion },
       data: {
         status: "PAUSED",
         version: { increment: 1 },
         updatedById: userId ?? undefined,
       },
-      include: TRIP_INCLUDE,
     });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Trip was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
 
     await tx.tripStatusHistory.create({
       data: {
@@ -722,9 +738,9 @@ export async function pauseTrip(
       afterValue: { status: "PAUSED" },
       actorId: userId,
     });
-
-    return result;
   });
+
+  const updated = await findScoped(tenantId, tripId);
 
   domainEvents.emitTyped("trip.paused", {
     tripId,
@@ -742,26 +758,24 @@ export async function resumeTrip(
 ) {
   const trip = await findScoped(tenantId, tripId);
 
-  if (trip.version !== expectedVersion) {
-    throw new ConflictError(
-      `Trip was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
-
   if (trip.status !== "PAUSED") {
     throw new BadRequestError("Trip must be PAUSED to resume");
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const result = await tx.trip.update({
-      where: { id: tripId },
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.trip.updateMany({
+      where: { id: tripId, version: expectedVersion },
       data: {
         status: "IN_PROGRESS",
         version: { increment: 1 },
         updatedById: userId ?? undefined,
       },
-      include: TRIP_INCLUDE,
     });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Trip was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
 
     await tx.tripStatusHistory.create({
       data: {
@@ -780,9 +794,9 @@ export async function resumeTrip(
       afterValue: { status: "IN_PROGRESS" },
       actorId: userId,
     });
-
-    return result;
   });
+
+  const updated = await findScoped(tenantId, tripId);
 
   domainEvents.emitTyped("trip.resumed", {
     tripId,

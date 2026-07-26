@@ -54,12 +54,13 @@ export async function recordCounts(req: Request, res: Response) {
   const tenantId = req.user?.tenantId!;
   const { id } = req.params;
 
-  const input = recordReconciliationCountsSchema.parse(req.body);
+  const { expectedVersion, ...input } = recordReconciliationCountsSchema.parse(req.body);
 
   const updated = await service.recordReconciliationCounts(
     tenantId,
     id,
     input,
+    expectedVersion,
     userId(req)
   );
 
@@ -71,11 +72,12 @@ export async function complete(req: Request, res: Response) {
   const { id } = req.params;
   const userRole = req.user?.role;
 
-  const input = completeReconciliationSchema.parse(req.body);
+  const { expectedVersion } = completeReconciliationSchema.parse(req.body);
 
   const updated = await service.completeReconciliation(
     tenantId,
     id,
+    expectedVersion,
     userRole,
     userId(req)
   );
@@ -87,9 +89,9 @@ export async function spawnDiscrepancyTask(req: Request, res: Response) {
   const tenantId = req.user?.tenantId!;
   const { id } = req.params;
 
-  const input = spawnDiscrepancyTaskSchema.parse(req.body);
+  const { expectedVersion, ...input } = spawnDiscrepancyTaskSchema.parse(req.body);
 
-  const task = await service.spawnDiscrepancyTask(tenantId, id, input, userId(req));
+  const task = await service.spawnDiscrepancyTask(tenantId, id, input, expectedVersion, userId(req));
 
   res.status(201).json(task);
 }

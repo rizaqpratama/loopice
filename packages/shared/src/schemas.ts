@@ -17,6 +17,7 @@ import { EXCEPTION_TYPES, EXCEPTION_SEVERITIES, EXCEPTION_STATUSES } from "./exc
 import { DEPENDENCY_TYPES } from "./dependencyType";
 import { PROOF_TYPES } from "./proofType";
 import { MANIFEST_ITEM_TYPES } from "./manifestEnums";
+import { ROUTE_STOP_TYPES } from "./routeEnums";
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -423,6 +424,11 @@ export const assignDriverSchema = z.object({
 
 export const addSecondaryDriverSchema = z.object({
   driverId: z.string().min(1),
+  expectedVersion: z.number().int(),
+});
+
+export const removeSecondaryDriverSchema = z.object({
+  expectedVersion: z.number().int(),
 });
 
 export const createRouteSchema = z.object({
@@ -443,8 +449,13 @@ export const updateRouteSchema = z.object({
   expectedVersion: z.number().int(),
 });
 
+export const updateRouteStatusSchema = z.object({
+  status: z.enum(["DRAFT", "PLANNED", "ACTIVE", "COMPLETED", "SUPERSEDED", "CANCELLED"]),
+  expectedVersion: z.number().int(),
+});
+
 export const createRouteStopSchema = z.object({
-  stopType: z.string().optional(),
+  stopType: z.enum(ROUTE_STOP_TYPES).optional(),
   sequenceNumber: z.number().int(),
   facilityId: z.string().optional(),
   locationName: z.string().optional(),
@@ -463,6 +474,35 @@ export const createRouteStopSchema = z.object({
   notes: z.string().optional(),
   isMandatory: z.boolean().optional(),
   sourceTaskId: z.string().optional(),
+  expectedVersion: z.number().int(),
+});
+
+export const updateRouteStopSchema = z.object({
+  stopType: z.enum(ROUTE_STOP_TYPES).optional(),
+  locationName: z.string().optional(),
+  address: z.string().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  contactName: z.string().optional(),
+  contactPhone: z.string().optional(),
+  plannedArrivalTime: z.string().datetime().optional(),
+  plannedDepartureTime: z.string().datetime().optional(),
+  estimatedServiceDurationMinutes: z.number().int().optional(),
+  timeWindowStart: z.string().datetime().optional(),
+  timeWindowEnd: z.string().datetime().optional(),
+  accessNotes: z.string().optional(),
+  instructions: z.string().optional(),
+  notes: z.string().optional(),
+  isMandatory: z.boolean().optional(),
+  expectedVersion: z.number().int(),
+});
+
+export const deleteRouteStopSchema = z.object({
+  expectedVersion: z.number().int(),
+});
+
+export const linkTaskToStopSchema = z.object({
+  expectedVersion: z.number().int(),
 });
 
 
@@ -549,6 +589,11 @@ export const acceptHandoverSchema = z.object({
   acceptedWithException: z.boolean().optional(),
   actualItemCount: z.number().int().optional(),
   notes: z.string().optional(),
+  expectedVersion: z.number().int(),
+});
+
+export const rejectHandoverSchema = z.object({
+  expectedVersion: z.number().int(),
 });
 
 // -- Receiving & Reconciliation --------------------------------------------------

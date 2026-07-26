@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import {
   createHandoverSchema,
   acceptHandoverSchema,
+  rejectHandoverSchema,
 } from "@loopice/shared";
 import * as service from "./facilityHandovers.service";
 
@@ -45,12 +46,13 @@ export async function get(req: Request, res: Response) {
 
 export async function accept(req: Request, res: Response) {
   const { id } = req.params;
-  const input = acceptHandoverSchema.parse(req.body);
+  const { expectedVersion, ...input } = acceptHandoverSchema.parse(req.body);
 
   const handover = await service.acceptHandover(
     tenantId(req),
     id,
     input,
+    expectedVersion,
     userRole(req),
     userId(req) ?? undefined
   );
@@ -60,8 +62,9 @@ export async function accept(req: Request, res: Response) {
 
 export async function reject(req: Request, res: Response) {
   const { id } = req.params;
+  const { expectedVersion } = rejectHandoverSchema.parse(req.body);
 
-  const handover = await service.rejectHandover(tenantId(req), id, userId(req));
+  const handover = await service.rejectHandover(tenantId(req), id, expectedVersion, userId(req));
 
   res.json(handover);
 }

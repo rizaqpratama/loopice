@@ -117,6 +117,7 @@ export async function recordReconciliationCounts(
   tenantId: string,
   reconciliationId: string,
   input: RecordReconciliationCountsInput,
+  expectedVersion: number,
   userId: string | null
 ) {
   const reconciliation = await findScopedReconciliation(tenantId, reconciliationId);
@@ -126,6 +127,16 @@ export async function recordReconciliationCounts(
   }
 
   await prisma.$transaction(async (tx) => {
+    const versionResult = await tx.receivingReconciliation.updateMany({
+      where: { id: reconciliationId, version: expectedVersion },
+      data: { version: { increment: 1 } },
+    });
+    if (versionResult.count === 0) {
+      throw new ConflictError(
+        `Reconciliation was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
+
     // Update each item with received quantity
     for (const count of input.counts) {
       const item = await tx.manifestItem.findFirst({
@@ -222,6 +233,7 @@ async function recomputeReconciliationStatus(
 export async function completeReconciliation(
   tenantId: string,
   reconciliationId: string,
+  expectedVersion: number,
   userRole?: string,
   userId: string | null = null
 ) {
@@ -235,16 +247,21 @@ export async function completeReconciliation(
     }
   }
 
-  const updated = await prisma.$transaction(async (tx) => {
-    const result = await tx.receivingReconciliation.update({
-      where: { id: reconciliationId },
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.receivingReconciliation.updateMany({
+      where: { id: reconciliationId, version: expectedVersion },
       data: {
         status: "COMPLETED",
         completedAt: new Date(),
         completedById: userId ?? undefined,
+        version: { increment: 1 },
       },
-      include: RECONCILIATION_INCLUDE,
     });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Reconciliation was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
 
     await recordAudit(tx, {
       tenantId,
@@ -255,9 +272,9 @@ export async function completeReconciliation(
       afterValue: { status: "COMPLETED" },
       actorId: userId,
     });
-
-    return result;
   });
+
+  const updated = await findScopedReconciliation(tenantId, reconciliationId);
 
   domainEvents.emitTyped("manifest.receiving_completed", {
     manifestId: reconciliation.manifestId,
@@ -277,12 +294,23 @@ export async function spawnDiscrepancyTask(
   tenantId: string,
   reconciliationId: string,
   input: SpawnDiscrepancyTaskInput,
+  expectedVersion: number,
   userId: string | null
 ) {
   const reconciliation = await findScopedReconciliation(tenantId, reconciliationId);
 
   if (reconciliation.status !== "DISCREPANCY") {
     throw new BadRequestError("Can only spawn follow-up tasks from DISCREPANCY status");
+  }
+
+  const versionResult = await prisma.receivingReconciliation.updateMany({
+    where: { id: reconciliationId, version: expectedVersion },
+    data: { version: { increment: 1 } },
+  });
+  if (versionResult.count === 0) {
+    throw new ConflictError(
+      `Reconciliation was modified by someone else (expected version ${expectedVersion})`
+    );
   }
 
   const item = await prisma.manifestItem.findFirst({

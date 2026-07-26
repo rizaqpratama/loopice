@@ -9,6 +9,7 @@ import {
   assignVehicleSchema,
   assignDriverSchema,
   addSecondaryDriverSchema,
+  removeSecondaryDriverSchema,
   createReplacementTripSchema,
 } from "@loopice/shared";
 
@@ -122,18 +123,26 @@ export async function unassignDriver(req: Request, res: Response) {
 }
 
 export async function addSecondaryDriver(req: Request, res: Response) {
-  const { driverId } = addSecondaryDriverSchema.parse(req.body);
+  const { driverId, expectedVersion } = addSecondaryDriverSchema.parse(req.body);
   res.json(
-    await tripsService.addSecondaryDriver(tenantId(req), req.params.id, driverId, userId(req))
+    await tripsService.addSecondaryDriver(
+      tenantId(req),
+      req.params.id,
+      driverId,
+      expectedVersion,
+      userId(req)
+    )
   );
 }
 
 export async function removeSecondaryDriver(req: Request, res: Response) {
+  const { expectedVersion } = removeSecondaryDriverSchema.parse(req.body);
   res.json(
     await tripsService.removeSecondaryDriver(
       tenantId(req),
       req.params.id,
       req.params.driverId,
+      expectedVersion,
       userId(req)
     )
   );

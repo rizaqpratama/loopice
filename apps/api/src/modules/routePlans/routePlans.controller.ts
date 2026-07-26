@@ -4,6 +4,11 @@ import * as routePlansService from "./routePlans.service";
 import {
   createRouteSchema,
   updateRouteSchema,
+  updateRouteStatusSchema,
+  createRouteStopSchema,
+  updateRouteStopSchema,
+  deleteRouteStopSchema,
+  linkTaskToStopSchema,
 } from "@loopice/shared";
 
 function tenantId(req: Request): string {
@@ -53,8 +58,16 @@ export async function update(req: Request, res: Response) {
 }
 
 export async function updateStatus(req: Request, res: Response) {
-  const { status } = req.body;
-  res.json(await routePlansService.updateRouteStatus(tenantId(req), req.params.id, status, userId(req)));
+  const { status, expectedVersion } = updateRouteStatusSchema.parse(req.body);
+  res.json(
+    await routePlansService.updateRouteStatus(
+      tenantId(req),
+      req.params.id,
+      status,
+      expectedVersion,
+      userId(req)
+    )
+  );
 }
 
 export async function createVersion(req: Request, res: Response) {
@@ -69,9 +82,15 @@ export async function activateVersion(req: Request, res: Response) {
 }
 
 export async function addStop(req: Request, res: Response) {
-  const input = req.body;
+  const { expectedVersion, ...input } = createRouteStopSchema.parse(req.body);
   res.status(201).json(
-    await routePlansService.addRouteStop(tenantId(req), req.params.id, input, userId(req))
+    await routePlansService.addRouteStop(
+      tenantId(req),
+      req.params.id,
+      input,
+      expectedVersion,
+      userId(req)
+    )
   );
 }
 
@@ -80,9 +99,15 @@ export async function getStop(req: Request, res: Response) {
 }
 
 export async function updateStop(req: Request, res: Response) {
-  const input = req.body;
+  const { expectedVersion, ...input } = updateRouteStopSchema.parse(req.body);
   res.json(
-    await routePlansService.updateRouteStop(tenantId(req), req.params.stopId, input, userId(req))
+    await routePlansService.updateRouteStop(
+      tenantId(req),
+      req.params.stopId,
+      input,
+      expectedVersion,
+      userId(req)
+    )
   );
 }
 
@@ -101,21 +126,39 @@ export async function reorderStops(req: Request, res: Response) {
 }
 
 export async function deleteStop(req: Request, res: Response) {
-  await routePlansService.deleteRouteStop(tenantId(req), req.params.stopId, userId(req));
+  const { expectedVersion } = deleteRouteStopSchema.parse(req.body);
+  await routePlansService.deleteRouteStop(
+    tenantId(req),
+    req.params.stopId,
+    expectedVersion,
+    userId(req)
+  );
   res.status(204).send();
 }
 
 export async function linkTask(req: Request, res: Response) {
-  const { taskId } = req.body;
+  const { expectedVersion } = linkTaskToStopSchema.parse(req.body);
   res.json(
-    await routePlansService.linkTaskToStop(tenantId(req), req.params.stopId, taskId, userId(req))
+    await routePlansService.linkTaskToStop(
+      tenantId(req),
+      req.params.stopId,
+      req.params.taskId,
+      expectedVersion,
+      userId(req)
+    )
   );
 }
 
 export async function unlinkTask(req: Request, res: Response) {
-  const { taskId } = req.body;
+  const { expectedVersion } = linkTaskToStopSchema.parse(req.body);
   res.json(
-    await routePlansService.unlinkTaskFromStop(tenantId(req), req.params.stopId, taskId, userId(req))
+    await routePlansService.unlinkTaskFromStop(
+      tenantId(req),
+      req.params.stopId,
+      req.params.taskId,
+      expectedVersion,
+      userId(req)
+    )
   );
 }
 
