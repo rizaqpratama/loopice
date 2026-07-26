@@ -49,7 +49,7 @@ export function TripListPage() {
         <div className="space-y-4">
           <div className="grid grid-cols-4 gap-4">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="status-filter">{t("trip.status")}</Label>
+              <Label htmlFor="status-filter">{t("trip.statusLabel")}</Label>
               <Select
                 id="status-filter"
                 value={filters.status}
@@ -95,8 +95,8 @@ export function TripListPage() {
           <TableHeader>
             <TableRow>
               <TableHead>{t("trip.tripNumber")}</TableHead>
-              <TableHead>{t("trip.type")}</TableHead>
-              <TableHead>{t("trip.status")}</TableHead>
+              <TableHead>{t("trip.typeLabel")}</TableHead>
+              <TableHead>{t("trip.statusLabel")}</TableHead>
               <TableHead>{t("trip.driver")}</TableHead>
               <TableHead>{t("trip.vehicle")}</TableHead>
               <TableHead>{t("common.actions")}</TableHead>

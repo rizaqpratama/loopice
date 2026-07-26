@@ -7,7 +7,23 @@
     "edit": "Edit",
     "all": "All",
     "total": "total",
-    "created": "Created"
+    "created": "Created",
+    "actions": "Actions",
+    "audit": "Audit",
+    "auditLogNotImplemented": "Audit log view is not yet available",
+    "driverId": "Driver ID",
+    "error": "Error",
+    "facilityId": "Facility ID",
+    "filter": "Filter",
+    "history": "History",
+    "noData": "No data",
+    "notFound": "Not found",
+    "select": "Select",
+    "selectItem": "Select an item",
+    "summary": "Summary",
+    "unassigned": "Unassigned",
+    "vehicleId": "Vehicle ID",
+    "view": "View"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -23,7 +39,15 @@
     "vehicles": "Vehicles",
     "teams": "Teams",
     "partners": "Partners",
-    "dispatchBoard": "Dispatch Board"
+    "dispatchBoard": "Dispatch Board",
+    "trips": "Trips",
+    "facilityReceiving": "Facility Receiving"
+  },
+  "facilityReceiving": {
+    "title": "Facility Receiving",
+    "queue": "Receiving Queue",
+    "detail": "Reconciliation Detail",
+    "startReceiving": "Start Receiving"
   },
   "auth": {
     "welcomeBack": "Welcome back",
@@ -478,8 +502,9 @@
     "create": "Create Trip",
     "list": "Trips",
     "tripNumber": "Trip #",
-    "type": "Trip Type",
-    "status": "Status",
+    "typeLabel": "Trip Type",
+    "statusLabel": "Status",
+    "transferType": "Transfer Type",
     "driver": "Driver",
     "driverPlaceholder": "Search by name or ID",
     "vehicle": "Vehicle",
@@ -501,12 +526,20 @@
       "DIRECT_DELIVERY": "Direct Delivery",
       "PICKUP_RUN": "Pickup Run",
       "DELIVERY_RUN": "Delivery Run",
+      "PICKUP_AND_DELIVERY": "Pickup and Delivery",
       "MILK_RUN": "Milk Run",
       "LINEHAUL": "Linehaul",
       "INTER_FACILITY": "Inter-Facility",
+      "INTER_HUB": "Inter-Hub",
       "WAREHOUSE_TRANSFER": "Warehouse Transfer",
       "BRANCH_TRANSFER": "Branch Transfer",
-      "CROSS_DOCK_TRANSFER": "Cross-Dock Transfer"
+      "DEPOT_TRANSFER": "Depot Transfer",
+      "CROSS_DOCK_TRANSFER": "Cross-Dock Transfer",
+      "FACILITY_TRANSFER": "Facility Transfer",
+      "RETURN_TRIP": "Return Trip",
+      "VEHICLE_REPOSITIONING": "Vehicle Repositioning",
+      "AD_HOC": "Ad Hoc",
+      "OTHER": "Other"
     },
     "status": {
       "DRAFT": "Draft",

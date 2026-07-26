@@ -16,6 +16,7 @@ import { DispatchBoardPage } from "@/pages/dispatch/DispatchBoardPage";
 import { TripListPage } from "@/pages/trips/TripListPage";
 import { TripCreatePage } from "@/pages/trips/TripCreatePage";
 import { TripDetailPage } from "@/pages/trips/TripDetailPage";
+import { FacilityReceivingPage } from "@/pages/facilities/FacilityReceivingPage";
 import { TenantBrandingSettingsPage } from "@/pages/settings/TenantBrandingSettingsPage";
 import { UserManagementPage } from "@/pages/settings/UserManagementPage";
 import { StationsSettingsPage } from "@/pages/settings/StationsSettingsPage";
@@ -63,6 +64,19 @@ export function AppRouter() {
       <Route path="/trips" element={<Shell><TripListPage /></Shell>} />
       <Route path="/trips/new" element={<Shell><TripCreatePage /></Shell>} />
       <Route path="/trips/:id" element={<Shell><TripDetailPage /></Shell>} />
+      <Route
+        path="/facilities/receiving"
+        element={
+          <Shell>
+            <RoleGate
+              allow={["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER", "WAREHOUSE_STAFF", "FACILITY_SUPERVISOR"]}
+              fallback={<Navigate to="/" replace />}
+            >
+              <FacilityReceivingPage />
+            </RoleGate>
+          </Shell>
+        }
+      />
       <Route
         path="/settings/branding"
         element={

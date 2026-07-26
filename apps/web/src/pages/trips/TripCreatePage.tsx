@@ -109,7 +109,7 @@ export function TripCreatePage() {
             </>
           ) : (
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="trip-type">{t("trip.type")}</Label>
+              <Label htmlFor="trip-type">{t("trip.typeLabel")}</Label>
               <Select
                 id="trip-type"
                 value={formData.tripType}

@@ -7,7 +7,23 @@
     "edit": "Ubah",
     "all": "Semua",
     "total": "total",
-    "created": "Dibuat"
+    "created": "Dibuat",
+    "actions": "Tindakan",
+    "audit": "Audit",
+    "auditLogNotImplemented": "Tampilan log audit belum tersedia",
+    "driverId": "ID Pengemudi",
+    "error": "Kesalahan",
+    "facilityId": "ID Fasilitas",
+    "filter": "Filter",
+    "history": "Riwayat",
+    "noData": "Tidak ada data",
+    "notFound": "Tidak ditemukan",
+    "select": "Pilih",
+    "selectItem": "Pilih item",
+    "summary": "Ringkasan",
+    "unassigned": "Belum ditugaskan",
+    "vehicleId": "ID Kendaraan",
+    "view": "Lihat"
   },
   "nav": {
     "dashboard": "Dasbor",
@@ -23,7 +39,15 @@
     "vehicles": "Kendaraan",
     "teams": "Tim",
     "partners": "Mitra",
-    "dispatchBoard": "Papan Dispatch"
+    "dispatchBoard": "Papan Dispatch",
+    "trips": "Perjalanan",
+    "facilityReceiving": "Penerimaan Fasilitas"
+  },
+  "facilityReceiving": {
+    "title": "Penerimaan Fasilitas",
+    "queue": "Antrean Penerimaan",
+    "detail": "Detail Rekonsiliasi",
+    "startReceiving": "Mulai Penerimaan"
   },
   "auth": {
     "welcomeBack": "Selamat datang kembali",
@@ -477,8 +501,9 @@
     "create": "Buat Perjalanan",
     "list": "Perjalanan",
     "tripNumber": "Perjalanan #",
-    "type": "Jenis Perjalanan",
-    "status": "Status",
+    "typeLabel": "Jenis Perjalanan",
+    "statusLabel": "Status",
+    "transferType": "Jenis Transfer",
     "driver": "Pengemudi",
     "driverPlaceholder": "Cari berdasarkan nama atau ID",
     "vehicle": "Kendaraan",
@@ -500,12 +525,20 @@
       "DIRECT_DELIVERY": "Pengiriman Langsung",
       "PICKUP_RUN": "Rute Pengambilan",
       "DELIVERY_RUN": "Rute Pengiriman",
+      "PICKUP_AND_DELIVERY": "Pengambilan dan Pengiriman",
       "MILK_RUN": "Milk Run",
       "LINEHAUL": "Linehaul",
       "INTER_FACILITY": "Antar-Fasilitas",
+      "INTER_HUB": "Antar-Hub",
       "WAREHOUSE_TRANSFER": "Transfer Gudang",
       "BRANCH_TRANSFER": "Transfer Cabang",
-      "CROSS_DOCK_TRANSFER": "Transfer Cross-Dock"
+      "DEPOT_TRANSFER": "Transfer Depot",
+      "CROSS_DOCK_TRANSFER": "Transfer Cross-Dock",
+      "FACILITY_TRANSFER": "Transfer Fasilitas",
+      "RETURN_TRIP": "Perjalanan Kembali",
+      "VEHICLE_REPOSITIONING": "Reposisi Kendaraan",
+      "AD_HOC": "Ad Hoc",
+      "OTHER": "Lainnya"
     },
     "status": {
       "DRAFT": "Draft",

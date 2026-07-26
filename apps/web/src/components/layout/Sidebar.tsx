@@ -21,9 +21,14 @@ const navItems = [
   { to: "/customers", key: "nav.customers", icon: Users },
   { to: "/service-orders", key: "nav.serviceOrders", icon: Package },
   { to: "/tasks", key: "nav.tasks", icon: ClipboardCheck },
+  { to: "/trips", key: "nav.trips", icon: Truck },
 ];
 
 const dispatchItems = [{ to: "/dispatch", key: "nav.dispatchBoard", icon: LayoutGrid }];
+
+const facilityItems = [
+  { to: "/facilities/receiving", key: "nav.facilityReceiving", icon: Warehouse },
+];
 
 const settingsItems = [
   { to: "/settings/branding", key: "nav.branding", icon: Palette },
@@ -95,6 +100,25 @@ export function Sidebar() {
 
         <RoleGate allow={["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER"]}>
           {dispatchItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink key={item.to} to={item.to} className={navLinkClass}>
+                {({ isActive }) => (
+                  <>
+                    <NavTick isActive={isActive} />
+                    <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+                    {t(item.key)}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </RoleGate>
+
+        <RoleGate
+          allow={["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER", "WAREHOUSE_STAFF", "FACILITY_SUPERVISOR"]}
+        >
+          {facilityItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink key={item.to} to={item.to} className={navLinkClass}>
