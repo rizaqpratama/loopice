@@ -125,7 +125,14 @@ export async function acceptHandover(
     throw new BadRequestError("Handover must be in PENDING status to accept");
   }
 
-  // Direction validation: DRIVER can only accept ORIGIN_TO_DRIVER handovers on their own trip
+  // Direction validation: DRIVER can only accept ORIGIN_TO_DRIVER handovers
+  // on their own trip; conversely, ORIGIN_TO_DRIVER handovers can only be
+  // accepted by the assigned driver, not by staff roles (DISPATCHER,
+  // WAREHOUSE_STAFF, etc.) that also carry WRITE access to this endpoint.
+  // This can't fully verify facility membership for staff roles accepting
+  // DRIVER_TO_DESTINATION/FACILITY_TO_PARTNER/PARTNER_TO_FACILITY handovers
+  // -- User has no facility/station link on this schema -- but it closes
+  // the direction mismatch, which is checkable today.
   if (userRole === "DRIVER") {
     if (handover.handoverType !== "ORIGIN_TO_DRIVER") {
       throw new ForbiddenError("Drivers can only accept origin handovers");
@@ -133,6 +140,8 @@ export async function acceptHandover(
     if (handover.toActorId !== userId) {
       throw new ForbiddenError("You can only accept handovers assigned to you");
     }
+  } else if (handover.handoverType === "ORIGIN_TO_DRIVER") {
+    throw new ForbiddenError("Only the assigned driver can accept an origin handover");
   }
 
   await prisma.$transaction(async (tx) => {
