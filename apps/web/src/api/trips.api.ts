@@ -20,30 +20,32 @@ export interface Trip {
   id: string;
   tenantId: string;
   tripNumber: string;
+  tripType: string;
+  status: TripStatus;
   routeId: string | null;
   route: RouteSummary | null;
-  driverId: string | null;
-  driver: Driver | null;
+  primaryDriverId: string | null;
+  primaryDriver: Driver | null;
   vehicleId: string | null;
   vehicle: Vehicle | null;
-  status: TripStatus;
-  scheduledDate: string | null;
-  startedAt: string | null;
-  completedAt: string | null;
-  notes: string | null;
+  originFacilityId: string | null;
+  destinationFacilityId: string | null;
+  manifest: any;
   tasks: TripTaskSummary[];
+  statusHistory: any[];
   createdAt: string;
   updatedAt: string;
+  version: number;
 }
 
-export function listTrips(params: { status?: TripStatus; driverId?: string; vehicleId?: string } = {}) {
+export function listTrips(params: { status?: TripStatus; driverId?: string; vehicleId?: string; skip?: number; take?: number } = {}) {
   return apiRequest<Trip[]>("/trips", { params });
 }
 
 export interface TripInput {
-  routeId?: string;
-  driverId?: string;
+  tripType?: string;
   vehicleId?: string;
+  primaryDriverId?: string;
   scheduledDate?: string;
   notes?: string;
 }
@@ -70,4 +72,8 @@ export function addTaskToTrip(tripId: string, taskId: string) {
 
 export function removeTaskFromTrip(tripId: string, taskId: string) {
   return apiRequest<Trip>(`/trips/${tripId}/tasks/${taskId}`, { method: "DELETE" });
+}
+
+export function createReplacementTrip(id: string, data: any) {
+  return apiRequest<Trip>(`/trips/${id}/replacement`, { method: "POST", body: data });
 }
