@@ -26,8 +26,11 @@ export async function recordAudit(tx: Prisma.TransactionClient | typeof prisma, 
       entityType: input.entityType,
       entityId: input.entityId,
       action: input.action,
-      beforeValue: input.beforeValue ? JSON.stringify(input.beforeValue) : undefined,
-      afterValue: input.afterValue ? JSON.stringify(input.afterValue) : undefined,
+      // Prisma Json fields accept the raw value directly and serialize it
+      // themselves -- JSON.stringify()'ing first would double-encode it as
+      // a JSON string containing JSON text instead of a queryable object.
+      beforeValue: input.beforeValue ?? undefined,
+      afterValue: input.afterValue ?? undefined,
       reason: input.reason,
       isOverride: input.isOverride ?? false,
       actorId: input.actorId ?? undefined,

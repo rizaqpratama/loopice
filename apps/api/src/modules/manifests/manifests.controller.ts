@@ -88,7 +88,7 @@ export async function updateItemReceiving(req: Request, res: Response) {
 export async function deleteItem(req: Request, res: Response) {
   const { id: manifestId, itemId } = req.params;
 
-  await service.deleteManifestItem(tenantId(req), manifestId, itemId);
+  await service.deleteManifestItem(tenantId(req), manifestId, itemId, userId(req));
 
   res.status(204).send();
 }

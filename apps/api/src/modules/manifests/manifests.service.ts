@@ -221,6 +221,15 @@ export async function addManifestItem(
         afterValue: { itemId: item.id, weight: input.weight, volume: input.volume },
         actorId: userId,
       });
+    } else {
+      await recordAudit(tx, {
+        tenantId,
+        entityType: "Manifest",
+        entityId: manifestId,
+        action: "MANIFEST_ITEM_ADDED",
+        afterValue: { itemId: item.id, identifier: item.identifier, weight: input.weight, volume: input.volume },
+        actorId: userId,
+      });
     }
 
     return item;
@@ -277,6 +286,16 @@ export async function updateManifestItemLoading(
       },
     });
 
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "ManifestItem",
+      entityId: itemId,
+      action: "MANIFEST_ITEM_LOADING_UPDATED",
+      beforeValue: { loadingStatus: item.loadingStatus },
+      afterValue: { loadingStatus },
+      actorId: userId,
+    });
+
     return result;
   });
 
@@ -315,10 +334,22 @@ export async function updateManifestItemReceiving(
       );
     }
 
-    return tx.manifestItem.update({
+    const result = await tx.manifestItem.update({
       where: { id: itemId },
       data: { receivingStatus: receivingStatus as any },
     });
+
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "ManifestItem",
+      entityId: itemId,
+      action: "MANIFEST_ITEM_RECEIVING_UPDATED",
+      beforeValue: { receivingStatus: item.receivingStatus },
+      afterValue: { receivingStatus },
+      actorId: userId,
+    });
+
+    return result;
   });
 
   if (receivingStatus === "RECEIVED") {
@@ -341,27 +372,39 @@ export async function sealManifest(
 ) {
   const manifest = await findScopedManifest(tenantId, manifestId);
 
-  if (manifest.version !== expectedVersion) {
-    throw new ConflictError(
-      `Manifest was modified by someone else (expected version ${expectedVersion})`
-    );
+  if (!canTransitionManifestStatus(manifest.status, "SEALED")) {
+    throw new BadRequestError(`Cannot seal manifest from status ${manifest.status}`);
   }
 
-  if (manifest.status !== "LOADED") {
-    throw new BadRequestError("Manifest must be LOADED before sealing");
-  }
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.manifest.updateMany({
+      where: { id: manifestId, version: expectedVersion },
+      data: {
+        sealNumber,
+        sealedAt: new Date(),
+        status: "SEALED",
+        version: { increment: 1 },
+        updatedById: userId ?? undefined,
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Manifest was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
 
-  const updated = await prisma.manifest.update({
-    where: { id: manifestId },
-    data: {
-      sealNumber,
-      sealedAt: new Date(),
-      status: "SEALED",
-      version: { increment: 1 },
-      updatedById: userId ?? undefined,
-    },
-    include: MANIFEST_INCLUDE,
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "Manifest",
+      entityId: manifestId,
+      action: "MANIFEST_SEALED",
+      beforeValue: { status: manifest.status },
+      afterValue: { status: "SEALED", sealNumber },
+      actorId: userId,
+    });
   });
+
+  const updated = await findScopedManifest(tenantId, manifestId);
 
   domainEvents.emitTyped("manifest.sealed", {
     manifestId,
@@ -444,6 +487,16 @@ export async function dispatchTrip(
           expectedItemCount: trip.activeManifest.plannedItemCount,
         },
       });
+
+      await recordAudit(tx, {
+        tenantId,
+        entityType: "Manifest",
+        entityId: trip.activeManifest.id,
+        action: "MANIFEST_DISPATCHED",
+        beforeValue: { status: trip.activeManifest.status },
+        afterValue: { status: "DISPATCHED" },
+        actorId: userId,
+      });
     }
 
     await tx.tripStatusHistory.create({
@@ -476,7 +529,8 @@ export async function dispatchTrip(
 export async function deleteManifestItem(
   tenantId: string,
   manifestId: string,
-  itemId: string
+  itemId: string,
+  userId: string | null = null
 ) {
   const manifest = await findScopedManifest(tenantId, manifestId);
 
@@ -485,8 +539,19 @@ export async function deleteManifestItem(
   });
   if (!item) throw new NotFoundError("Manifest item not found");
 
-  await prisma.manifestItem.delete({
-    where: { id: itemId },
+  await prisma.$transaction(async (tx) => {
+    await tx.manifestItem.delete({
+      where: { id: itemId },
+    });
+
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "Manifest",
+      entityId: manifestId,
+      action: "MANIFEST_ITEM_REMOVED",
+      beforeValue: { itemId, identifier: item.identifier },
+      actorId: userId,
+    });
   });
 }
 

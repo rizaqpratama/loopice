@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { domainEvents } from "../../lib/domainEvents";
+import { recordAudit } from "../../lib/auditLog";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../lib/httpError";
 
 const HANDOVER_INCLUDE = {
@@ -53,26 +54,39 @@ export async function createHandover(
   });
   if (!facility) throw new BadRequestError("Facility not found");
 
-  const created = await prisma.facilityHandover.create({
-    data: {
+  const created = await prisma.$transaction(async (tx) => {
+    const handover = await tx.facilityHandover.create({
+      data: {
+        tenantId,
+        tripId: input.tripId,
+        manifestId: input.manifestId,
+        handoverType: input.handoverType,
+        facilityId: input.facilityId,
+        fromActorType: input.fromActorType,
+        fromActorId: input.fromActorId,
+        toActorType: input.toActorType,
+        toActorId: input.toActorId,
+        status: "PENDING",
+        expectedItemCount: input.expectedItemCount,
+        sealNumber: input.sealNumber,
+        sealCondition: input.sealCondition,
+        notes: input.notes,
+        createdById: userId ?? undefined,
+        version: 1,
+      },
+      include: HANDOVER_INCLUDE,
+    });
+
+    await recordAudit(tx, {
       tenantId,
-      tripId: input.tripId,
-      manifestId: input.manifestId,
-      handoverType: input.handoverType,
-      facilityId: input.facilityId,
-      fromActorType: input.fromActorType,
-      fromActorId: input.fromActorId,
-      toActorType: input.toActorType,
-      toActorId: input.toActorId,
-      status: "PENDING",
-      expectedItemCount: input.expectedItemCount,
-      sealNumber: input.sealNumber,
-      sealCondition: input.sealCondition,
-      notes: input.notes,
-      createdById: userId ?? undefined,
-      version: 1,
-    },
-    include: HANDOVER_INCLUDE,
+      entityType: "FacilityHandover",
+      entityId: handover.id,
+      action: "HANDOVER_CREATED",
+      afterValue: { handoverType: input.handoverType, status: "PENDING" },
+      actorId: userId,
+    });
+
+    return handover;
   });
 
   return created;
@@ -160,6 +174,16 @@ export async function acceptHandover(
         `Handover was modified by someone else (expected version ${expectedVersion})`
       );
     }
+
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "FacilityHandover",
+      entityId: handoverId,
+      action: "HANDOVER_ACCEPTED",
+      beforeValue: { status: handover.status },
+      afterValue: { status: input.acceptedWithException ? "ACCEPTED_WITH_EXCEPTION" : "ACCEPTED" },
+      actorId: userId ?? null,
+    });
   });
 
   const updated = await findScopedHandover(tenantId, handoverId);
@@ -205,6 +229,16 @@ export async function rejectHandover(
         `Handover was modified by someone else (expected version ${expectedVersion})`
       );
     }
+
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "FacilityHandover",
+      entityId: handoverId,
+      action: "HANDOVER_REJECTED",
+      beforeValue: { status: handover.status },
+      afterValue: { status: "REJECTED" },
+      actorId: userId,
+    });
   });
 
   return findScopedHandover(tenantId, handoverId);
