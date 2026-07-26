@@ -84,7 +84,9 @@ export async function updateException(
   const updated = await prisma.taskException.update({ where: { id }, data, include: EXCEPTION_INCLUDE });
   if (input.status === "RESOLVED" && exception.status !== "RESOLVED") {
     domainEvents.emitTyped("task.exception_resolved", {
-      taskId: exception.taskId,
+      taskId: exception.taskId ?? undefined,
+      tripId: exception.tripId ?? undefined,
+      manifestId: exception.manifestId ?? undefined,
       tenantId,
       exceptionId: exception.id,
     });

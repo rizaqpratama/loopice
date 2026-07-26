@@ -16,6 +16,7 @@ import { TRIP_STATUSES, TRIP_TYPES, TRANSFER_TYPES } from "./tripEnums";
 import { EXCEPTION_TYPES, EXCEPTION_SEVERITIES, EXCEPTION_STATUSES } from "./exceptionType";
 import { DEPENDENCY_TYPES } from "./dependencyType";
 import { PROOF_TYPES } from "./proofType";
+import { MANIFEST_ITEM_TYPES } from "./manifestEnums";
 
 export const loginSchema = z.object({
   email: z.string().email(),
@@ -490,4 +491,39 @@ export const createTaskTypeConfigSchema = z.object({
 
 export const updateTaskTypeConfigSchema = createTaskTypeConfigSchema.partial().extend({
   isActive: z.boolean().optional(),
+});
+
+// -- Manifest management --------------------------------------------------
+
+export const createManifestSchema = z.object({
+  tripId: z.string().min(1),
+  originFacilityId: z.string().min(1),
+  destinationFacilityId: z.string().min(1),
+});
+
+export const addManifestItemSchema = z.object({
+  shipmentId: z.string().optional(),
+  cargoItemId: z.string().optional(),
+  handlingUnitId: z.string().optional(),
+  itemType: z.enum(MANIFEST_ITEM_TYPES).optional(),
+  identifier: z.string().optional(),
+  plannedQuantity: z.number().int().positive().optional(),
+  weight: z.number().positive().optional(),
+  volume: z.number().positive().optional(),
+  notes: z.string().optional(),
+});
+
+export const updateManifestItemLoadingSchema = z.object({
+  loadingStatus: z.string().min(1),
+  expectedVersion: z.number().int(),
+});
+
+export const updateManifestItemReceivingSchema = z.object({
+  receivingStatus: z.string().min(1),
+  expectedVersion: z.number().int(),
+});
+
+export const sealManifestSchema = z.object({
+  sealNumber: z.string().min(1),
+  expectedVersion: z.number().int(),
 });
