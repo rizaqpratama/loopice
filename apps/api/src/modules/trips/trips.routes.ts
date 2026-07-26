@@ -54,3 +54,10 @@ tripsRoutes.get("/:id/dispatch-check", requireRole([...READ_ROLES]), asyncHandle
 // Pause and resume
 tripsRoutes.patch("/:id/pause", requireRole([...WRITE_ROLES]), asyncHandler(controller.pause));
 tripsRoutes.patch("/:id/resume", requireRole([...WRITE_ROLES]), asyncHandler(controller.resume));
+
+// Replacement trip (Ops Manager+ only)
+tripsRoutes.post(
+  "/:id/replacement",
+  requireRole(["TENANT_ADMIN", "OPERATIONS_MANAGER"]),
+  asyncHandler(controller.createReplacement)
+);

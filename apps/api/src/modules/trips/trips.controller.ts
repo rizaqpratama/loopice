@@ -9,6 +9,7 @@ import {
   assignVehicleSchema,
   assignDriverSchema,
   addSecondaryDriverSchema,
+  createReplacementTripSchema,
 } from "@loopice/shared";
 
 function tenantId(req: Request): string {
@@ -177,5 +178,17 @@ export async function resume(req: Request, res: Response) {
   const { expectedVersion } = updateTripStatusSchema.parse(req.body);
   res.json(
     await tripsService.resumeTrip(tenantId(req), req.params.id, expectedVersion, userId(req))
+  );
+}
+
+export async function createReplacement(req: Request, res: Response) {
+  const input = createReplacementTripSchema.parse(req.body);
+  res.status(201).json(
+    await tripsService.createReplacementTrip(
+      tenantId(req),
+      req.params.id,
+      input,
+      userId(req)
+    )
   );
 }

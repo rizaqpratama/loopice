@@ -584,3 +584,11 @@ export const spawnDiscrepancyTaskSchema = z.object({
   expectedVersion: z.number().int(),
   clientRequestId: z.string().optional(),
 });
+
+// -- Trip Replacement --------------------------------------------------
+
+export const createReplacementTripSchema = z.object({
+  vehicleId: z.string().optional(),
+  primaryDriverId: z.string().optional(),
+  replacementReason: z.string().min(1),
+});

@@ -791,3 +791,197 @@ export async function resumeTrip(
 
   return updated;
 }
+
+export interface CreateReplacementTripInput {
+  vehicleId?: string;
+  primaryDriverId?: string;
+  replacementReason: string;
+}
+
+export async function createReplacementTrip(
+  tenantId: string,
+  parentTripId: string,
+  input: CreateReplacementTripInput,
+  userId: string | null
+) {
+  const parentTrip = await findScoped(tenantId, parentTripId);
+
+  if (parentTrip.replacementTripId) {
+    throw new BadRequestError("Trip already has a replacement trip");
+  }
+
+  const manifest = await prisma.manifest.findFirst({
+    where: { tripId: parentTripId, tenantId },
+    include: { items: true },
+  });
+
+  if (!manifest) {
+    throw new BadRequestError("No manifest found for trip");
+  }
+
+  // Check vehicle availability if provided
+  if (input.vehicleId) {
+    const vehicle = await prisma.vehicle.findFirst({
+      where: { id: input.vehicleId, tenantId },
+    });
+    if (!vehicle) throw new BadRequestError("Vehicle not found");
+  }
+
+  // Check driver availability if provided
+  if (input.primaryDriverId) {
+    const driver = await prisma.driver.findFirst({
+      where: { id: input.primaryDriverId, tenantId },
+    });
+    if (!driver) throw new BadRequestError("Driver not found");
+  }
+
+  const created = await prisma.$transaction(async (tx) => {
+    // Generate new trip number
+    const tripCount = await tx.trip.count({ where: { tenantId } });
+    const newTripNumber = `TRIP-${Date.now()}-${tripCount + 1}`;
+
+    // Create replacement trip
+    const replacement = await tx.trip.create({
+      data: {
+        tenantId,
+        tripNumber: newTripNumber,
+        tripType: parentTrip.tripType,
+        transferType: parentTrip.transferType,
+        status: "DRAFT",
+        serviceDate: parentTrip.serviceDate,
+        vehicleId: input.vehicleId || parentTrip.vehicleId,
+        primaryDriverId: input.primaryDriverId || parentTrip.primaryDriverId,
+        originFacilityId: parentTrip.originFacilityId,
+        destinationFacilityId: parentTrip.destinationFacilityId,
+        originLocationId: parentTrip.originLocationId,
+        destinationLocationId: parentTrip.destinationLocationId,
+        parentTripId,
+        replacementReason: input.replacementReason,
+        instructions: parentTrip.instructions,
+        notes: parentTrip.notes,
+        createdById: userId ?? undefined,
+      },
+      include: TRIP_INCLUDE,
+    });
+
+    // Create replacement manifest with carried-forward items
+    const newManifestNumber = `MFT-${Date.now()}-${replacement.id.slice(0, 8)}`;
+    const newManifest = await tx.manifest.create({
+      data: {
+        tenantId,
+        manifestNumber: newManifestNumber,
+        tripId: replacement.id,
+        originFacilityId: manifest.originFacilityId,
+        destinationFacilityId: manifest.destinationFacilityId,
+        status: "DRAFT",
+        createdById: userId ?? undefined,
+      },
+    });
+
+    // Copy manifest items with lineage tracking
+    const carryForwardItems = manifest.items.filter((item) => item.receivingStatus !== "RECEIVED");
+    for (const item of carryForwardItems) {
+      await tx.manifestItem.create({
+        data: {
+          tenantId,
+          manifestId: newManifest.id,
+          shipmentId: item.shipmentId,
+          cargoItemId: item.cargoItemId,
+          handlingUnitId: item.handlingUnitId,
+          sourceManifestItemId: item.id,
+          itemType: item.itemType,
+          identifier: item.identifier,
+          plannedQuantity: item.plannedQuantity,
+          weight: item.weight,
+          volume: item.volume,
+          notes: item.notes,
+        },
+      });
+    }
+
+    // Update parent trip to point to replacement
+    await tx.trip.update({
+      where: { id: parentTripId },
+      data: { replacementTripId: replacement.id },
+    });
+
+    // Create new route from remaining stops (if parent has an active route)
+    if (parentTrip.activeRouteId) {
+      const activeRoute = await tx.route.findUnique({
+        where: { id: parentTrip.activeRouteId },
+        include: { stops: { orderBy: { sequenceNumber: "asc" } } },
+      });
+
+      if (activeRoute) {
+        const newRouteNumber = `RT-${Date.now()}-${replacement.id.slice(0, 8)}`;
+        const newRoute = await tx.route.create({
+          data: {
+            tenantId,
+            routeNumber: newRouteNumber,
+            name: `${activeRoute.name} (Replacement)`,
+            tripId: replacement.id,
+            status: "DRAFT",
+            source: "RECALCULATED",
+            createdById: userId ?? undefined,
+          },
+        });
+
+        // Copy remaining stops
+        for (const stop of activeRoute.stops) {
+          await tx.routeStop.create({
+            data: {
+              tenantId,
+              routeId: newRoute.id,
+              sequenceNumber: stop.sequenceNumber,
+              stopType: stop.stopType,
+              status: "PLANNED",
+              facilityId: stop.facilityId,
+              locationName: stop.locationName,
+              address: stop.address,
+              latitude: stop.latitude,
+              longitude: stop.longitude,
+              contactName: stop.contactName,
+              contactPhone: stop.contactPhone,
+              plannedArrivalTime: stop.plannedArrivalTime,
+              plannedDepartureTime: stop.plannedDepartureTime,
+              estimatedServiceDurationMinutes: stop.estimatedServiceDurationMinutes,
+              timeWindowStart: stop.timeWindowStart,
+              timeWindowEnd: stop.timeWindowEnd,
+              accessNotes: stop.accessNotes,
+              instructions: stop.instructions,
+              notes: stop.notes,
+            },
+          });
+        }
+
+        // Set as active route
+        await tx.trip.update({
+          where: { id: replacement.id },
+          data: { activeRouteId: newRoute.id },
+        });
+      }
+    }
+
+    // Record audit
+    await recordAudit(tx, {
+      tenantId,
+      entityType: "Trip",
+      entityId: parentTripId,
+      action: "REPLACEMENT_TRIP_CREATED",
+      beforeValue: { replacementTripId: parentTrip.replacementTripId },
+      afterValue: { replacementTripId: replacement.id, reason: input.replacementReason },
+      actorId: userId,
+    });
+
+    return replacement;
+  });
+
+  domainEvents.emitTyped("trip.replacement_created", {
+    originalTripId: parentTripId,
+    replacementTripId: created.id,
+    tenantId,
+    reason: input.replacementReason,
+  });
+
+  return created;
+}
