@@ -283,6 +283,12 @@ export const createExceptionSchema = z.object({
   description: z.string().optional(),
 });
 
+export const reportTripExceptionSchema = z.object({
+  type: z.enum(EXCEPTION_TYPES),
+  severity: z.enum(EXCEPTION_SEVERITIES).optional(),
+  description: z.string().optional(),
+});
+
 export const updateExceptionSchema = z.object({
   severity: z.enum(EXCEPTION_SEVERITIES).optional(),
   status: z.enum(EXCEPTION_STATUSES).optional(),

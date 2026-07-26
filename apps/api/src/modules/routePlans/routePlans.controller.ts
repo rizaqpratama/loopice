@@ -123,7 +123,13 @@ export async function updateStop(req: Request, res: Response) {
 export async function updateStopStatus(req: Request, res: Response) {
   const { status } = req.body;
   res.json(
-    await routePlansService.updateRouteStopStatus(tenantId(req), req.params.stopId, status, userId(req))
+    await routePlansService.updateRouteStopStatus(
+      tenantId(req),
+      req.params.stopId,
+      status,
+      userId(req),
+      req.user?.role
+    )
   );
 }
 

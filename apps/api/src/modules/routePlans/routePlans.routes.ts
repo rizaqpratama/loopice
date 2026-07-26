@@ -43,7 +43,11 @@ export const routeStopsFlatRoutes = Router();
 // Get, update, delete stop
 routeStopsFlatRoutes.get("/:stopId", requireRole([...READ_ROLES]), asyncHandler(controller.getStop));
 routeStopsFlatRoutes.patch("/:stopId", requireRole([...WRITE_ROLES]), asyncHandler(controller.updateStop));
-routeStopsFlatRoutes.patch("/:stopId/status", requireRole([...WRITE_ROLES]), asyncHandler(controller.updateStopStatus));
+routeStopsFlatRoutes.patch(
+  "/:stopId/status",
+  requireRole([...WRITE_ROLES, "DRIVER"]),
+  asyncHandler(controller.updateStopStatus)
+);
 routeStopsFlatRoutes.delete("/:stopId", requireRole([...WRITE_ROLES]), asyncHandler(controller.deleteStop));
 
 // Link/unlink tasks

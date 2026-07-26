@@ -11,6 +11,7 @@ import {
   addSecondaryDriverSchema,
   removeSecondaryDriverSchema,
   createReplacementTripSchema,
+  reportTripExceptionSchema,
 } from "@loopice/shared";
 
 function tenantId(req: Request): string {
@@ -20,6 +21,17 @@ function tenantId(req: Request): string {
 
 function userId(req: Request): string | null {
   return req.user?.userId ?? null;
+}
+
+// DRIVER role is route-level allowed onto a handful of trip endpoints
+// (own trip read, dispatch-check, status/pause/resume, exception
+// reporting) but must be confined to trips they're the primary driver on;
+// every other role that reached this handler via requireRole is
+// unrestricted. Mirrors tasks.controller.ts's assertTaskAccess.
+async function assertTripAccess(req: Request, tripId: string): Promise<void> {
+  if (req.user?.role !== "DRIVER") return;
+  const trip = await tripsService.getTrip(tenantId(req), tripId);
+  await tripsService.assertOwnsTripOrPrivileged(tenantId(req), req.user.userId, req.user.role, trip);
 }
 
 export async function list(req: Request, res: Response) {
@@ -61,6 +73,7 @@ export async function create(req: Request, res: Response) {
 }
 
 export async function get(req: Request, res: Response) {
+  await assertTripAccess(req, req.params.id);
   res.json(await tripsService.getTrip(tenantId(req), req.params.id));
 }
 
@@ -73,6 +86,7 @@ export async function update(req: Request, res: Response) {
 }
 
 export async function updateStatus(req: Request, res: Response) {
+  await assertTripAccess(req, req.params.id);
   const { status, note, expectedVersion, clientRequestId } =
     updateTripStatusSchema.parse(req.body);
   res.json(
@@ -173,10 +187,12 @@ export async function removeTask(req: Request, res: Response) {
 }
 
 export async function getDispatchChecklist(req: Request, res: Response) {
+  await assertTripAccess(req, req.params.id);
   res.json(await tripsService.getDispatchChecklist(tenantId(req), req.params.id));
 }
 
 export async function pause(req: Request, res: Response) {
+  await assertTripAccess(req, req.params.id);
   const { expectedVersion } = updateTripStatusSchema.parse(req.body);
   res.json(
     await tripsService.pauseTrip(tenantId(req), req.params.id, expectedVersion, userId(req))
@@ -184,9 +200,18 @@ export async function pause(req: Request, res: Response) {
 }
 
 export async function resume(req: Request, res: Response) {
+  await assertTripAccess(req, req.params.id);
   const { expectedVersion } = updateTripStatusSchema.parse(req.body);
   res.json(
     await tripsService.resumeTrip(tenantId(req), req.params.id, expectedVersion, userId(req))
+  );
+}
+
+export async function reportException(req: Request, res: Response) {
+  await assertTripAccess(req, req.params.id);
+  const input = reportTripExceptionSchema.parse(req.body);
+  res.status(201).json(
+    await tripsService.reportTripException(tenantId(req), req.params.id, input, userId(req))
   );
 }
 

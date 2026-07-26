@@ -6,11 +6,13 @@ import {
   type RouteStopType,
   type RouteStopStatus,
   type RouteStopTaskAssignmentStatus,
+  type UserRole,
 } from "@loopice/shared";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { domainEvents } from "../../lib/domainEvents";
-import { BadRequestError, ConflictError, NotFoundError } from "../../lib/httpError";
+import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../lib/httpError";
+import { findOwnDriverId } from "../../lib/assertOwnsOrPrivileged";
 import { linkTaskToRouteStop, unlinkTaskFromRouteStop } from "../tasks/routeStopLinking";
 
 const ROUTE_INCLUDE = {
@@ -558,13 +560,44 @@ export async function updateRouteStop(
   return findScopedStop(tenantId, stopId);
 }
 
+// requireRole grants DRIVER route-level access to this endpoint; this
+// confines them to stops on a route belonging to their own trip. Every
+// other role that reached the service is unrestricted.
+async function assertOwnsRouteStopOrPrivileged(
+  tenantId: string,
+  actorUserId: string | null,
+  actorRole: UserRole | undefined,
+  stop: { routeId: string }
+): Promise<void> {
+  if (actorRole !== "DRIVER") return;
+  if (!actorUserId) throw new ForbiddenError("You may only access stops on your own trips");
+
+  const route = await prisma.route.findFirst({
+    where: { id: stop.routeId, tenantId },
+    select: { tripId: true },
+  });
+  const trip = route?.tripId
+    ? await prisma.trip.findFirst({
+        where: { id: route.tripId, tenantId },
+        select: { primaryDriverId: true },
+      })
+    : null;
+
+  const driverId = await findOwnDriverId(tenantId, actorUserId);
+  if (!driverId || !trip || trip.primaryDriverId !== driverId) {
+    throw new ForbiddenError("You may only access stops on your own trips");
+  }
+}
+
 export async function updateRouteStopStatus(
   tenantId: string,
   stopId: string,
   newStatus: RouteStopStatus,
-  userId: string | null
+  userId: string | null,
+  actorRole?: UserRole
 ) {
   const stop = await findScopedStop(tenantId, stopId);
+  await assertOwnsRouteStopOrPrivileged(tenantId, userId, actorRole, stop);
 
   if (!canTransitionRouteStopStatus(stop.status, newStatus)) {
     throw new BadRequestError(`Cannot transition stop from ${stop.status} to ${newStatus}`);

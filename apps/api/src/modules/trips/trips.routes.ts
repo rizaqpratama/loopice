@@ -20,9 +20,13 @@ tripsRoutes.get("/", requireRole([...READ_ROLES]), asyncHandler(controller.list)
 tripsRoutes.post("/", requireRole([...WRITE_ROLES]), asyncHandler(controller.create));
 
 // Get, update, status
-tripsRoutes.get("/:id", requireRole([...READ_ROLES]), asyncHandler(controller.get));
+tripsRoutes.get("/:id", requireRole([...READ_ROLES, "DRIVER"]), asyncHandler(controller.get));
 tripsRoutes.patch("/:id", requireRole([...WRITE_ROLES]), asyncHandler(controller.update));
-tripsRoutes.patch("/:id/status", requireRole([...WRITE_ROLES]), asyncHandler(controller.updateStatus));
+tripsRoutes.patch(
+  "/:id/status",
+  requireRole([...WRITE_ROLES, "DRIVER"]),
+  asyncHandler(controller.updateStatus)
+);
 
 // Vehicle assignment
 tripsRoutes.patch("/:id/vehicle", requireRole([...WRITE_ROLES]), asyncHandler(controller.assignVehicle));
@@ -49,11 +53,30 @@ tripsRoutes.post("/:id/tasks/:taskId", requireRole([...WRITE_ROLES]), asyncHandl
 tripsRoutes.delete("/:id/tasks/:taskId", requireRole([...WRITE_ROLES]), asyncHandler(controller.removeTask));
 
 // Dispatch check
-tripsRoutes.get("/:id/dispatch-check", requireRole([...READ_ROLES]), asyncHandler(controller.getDispatchChecklist));
+tripsRoutes.get(
+  "/:id/dispatch-check",
+  requireRole([...READ_ROLES, "DRIVER"]),
+  asyncHandler(controller.getDispatchChecklist)
+);
 
 // Pause and resume
-tripsRoutes.patch("/:id/pause", requireRole([...WRITE_ROLES]), asyncHandler(controller.pause));
-tripsRoutes.patch("/:id/resume", requireRole([...WRITE_ROLES]), asyncHandler(controller.resume));
+tripsRoutes.patch(
+  "/:id/pause",
+  requireRole([...WRITE_ROLES, "DRIVER"]),
+  asyncHandler(controller.pause)
+);
+tripsRoutes.patch(
+  "/:id/resume",
+  requireRole([...WRITE_ROLES, "DRIVER"]),
+  asyncHandler(controller.resume)
+);
+
+// Exceptions
+tripsRoutes.post(
+  "/:id/exceptions",
+  requireRole([...WRITE_ROLES, "DRIVER"]),
+  asyncHandler(controller.reportException)
+);
 
 // Replacement trip (Ops Manager+ only)
 tripsRoutes.post(

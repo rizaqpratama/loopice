@@ -3,6 +3,8 @@ import {
   type TripStatus,
   type TripType,
   type TransferType,
+  type ExceptionSeverity,
+  type ExceptionType,
 } from "@loopice/shared";
 import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
@@ -831,6 +833,42 @@ export async function resumeTrip(
   });
 
   return updated;
+}
+
+export interface ReportTripExceptionInput {
+  type: ExceptionType;
+  severity?: ExceptionSeverity;
+  description?: string;
+}
+
+export async function reportTripException(
+  tenantId: string,
+  tripId: string,
+  input: ReportTripExceptionInput,
+  actorUserId: string | null
+) {
+  await findScoped(tenantId, tripId);
+
+  const exception = await prisma.taskException.create({
+    data: {
+      tenantId,
+      tripId,
+      type: input.type,
+      severity: input.severity ?? "MEDIUM",
+      status: "OPEN",
+      description: input.description,
+      reportedById: actorUserId ?? undefined,
+    },
+  });
+
+  domainEvents.emitTyped("task.exception_reported", {
+    tripId,
+    tenantId,
+    exceptionId: exception.id,
+    type: exception.type,
+  });
+
+  return exception;
 }
 
 export interface CreateReplacementTripInput {
