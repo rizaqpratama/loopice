@@ -9,6 +9,7 @@ import {
   updateRouteStopSchema,
   deleteRouteStopSchema,
   linkTaskToStopSchema,
+  activateRouteVersionSchema,
 } from "@loopice/shared";
 
 function tenantId(req: Request): string {
@@ -78,7 +79,15 @@ export async function createVersion(req: Request, res: Response) {
 }
 
 export async function activateVersion(req: Request, res: Response) {
-  res.json(await routePlansService.activateRouteVersion(tenantId(req), req.params.id, userId(req)));
+  const { expectedVersion } = activateRouteVersionSchema.parse(req.body);
+  res.json(
+    await routePlansService.activateRouteVersion(
+      tenantId(req),
+      req.params.id,
+      expectedVersion,
+      userId(req)
+    )
+  );
 }
 
 export async function addStop(req: Request, res: Response) {

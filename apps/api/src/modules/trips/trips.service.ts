@@ -653,6 +653,9 @@ export interface DispatchCheckResult {
   blockers: string[];
 }
 
+// Also exported as computeDispatchChecklist so other modules (e.g.
+// manifests.service.ts's dispatchTrip) can reuse it instead of maintaining
+// a second, drifting copy of the same readiness logic.
 export async function getDispatchChecklist(
   tenantId: string,
   tripId: string
@@ -682,9 +685,15 @@ export async function getDispatchChecklist(
   }
 
   if (trip.activeRoute) {
-    const missingStops = trip.activeRoute.stops.filter((s) => s.isMandatory && !s.facilityId);
+    // A mandatory stop is only a blocker if it has NO location data at all --
+    // RouteStop supports non-facility stops (e.g. customer deliveries) via
+    // locationName/address instead of facilityId, so requiring facilityId
+    // unconditionally would block dispatch of any trip with such a stop.
+    const missingStops = trip.activeRoute.stops.filter(
+      (s) => s.isMandatory && !s.facilityId && !s.locationName && !s.address
+    );
     if (missingStops.length > 0) {
-      blockers.push(`${missingStops.length} mandatory route stops missing facility`);
+      blockers.push(`${missingStops.length} mandatory route stops missing a location`);
     }
   }
 

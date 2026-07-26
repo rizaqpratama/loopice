@@ -454,6 +454,10 @@ export const updateRouteStatusSchema = z.object({
   expectedVersion: z.number().int(),
 });
 
+export const activateRouteVersionSchema = z.object({
+  expectedVersion: z.number().int(),
+});
+
 export const createRouteStopSchema = z.object({
   stopType: z.enum(ROUTE_STOP_TYPES).optional(),
   sequenceNumber: z.number().int(),

@@ -7,6 +7,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { domainEvents } from "../../lib/domainEvents";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/httpError";
+import { getDispatchChecklist as computeDispatchChecklist } from "../trips/trips.service";
 
 const MANIFEST_INCLUDE = {
   trip: true,
@@ -284,39 +285,11 @@ export async function sealManifest(
   return updated;
 }
 
-export interface DispatchCheckResult {
-  ready: boolean;
-  blockers: string[];
-}
-
-export async function getDispatchChecklist(
-  tenantId: string,
-  tripId: string
-): Promise<DispatchCheckResult> {
-  const trip = await prisma.trip.findFirst({
-    where: { id: tripId, tenantId },
-    include: { activeManifest: true },
-  });
-
-  if (!trip) throw new NotFoundError("Trip not found");
-
-  const blockers: string[] = [];
-
-  if (!trip.primaryDriverId) blockers.push("No primary driver assigned");
-  if (!trip.vehicleId) blockers.push("No vehicle assigned");
-  if (!trip.activeRouteId) blockers.push("No route assigned");
-
-  if (!trip.activeManifest) {
-    blockers.push("No manifest created");
-  } else if (trip.activeManifest.status !== "SEALED") {
-    blockers.push("Manifest must be sealed before dispatch");
-  }
-
-  return {
-    ready: blockers.length === 0,
-    blockers,
-  };
-}
+// Delegates to trips.service.ts's getDispatchChecklist instead of
+// maintaining a second, independently-drifting copy of the same readiness
+// logic -- this file's own copy previously lacked the mandatory-stop and
+// critical-exception checks the trips.service.ts version has.
+export const getDispatchChecklist = computeDispatchChecklist;
 
 export async function dispatchTrip(
   tenantId: string,

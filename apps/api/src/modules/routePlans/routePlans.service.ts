@@ -169,6 +169,40 @@ export async function updateRoute(
   return findScopedRoute(tenantId, id);
 }
 
+// Shared by updateRouteStatus and activateRouteVersion -- the only two
+// places a Route can transition to ACTIVE. Supersedes whatever route was
+// previously ACTIVE for this trip and points Trip.activeRouteId at the new
+// one, all inside the caller's transaction so a concurrent activation for
+// the same trip serializes on the trip row lock instead of racing: the
+// version read and the conditional update both happen inside one
+// transaction, so a second concurrent call's version match necessarily
+// fails once the first commits.
+async function activateRouteForTrip(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  tripId: string,
+  routeId: string,
+  userId: string | null
+) {
+  await tx.route.updateMany({
+    where: { tenantId, tripId, status: "ACTIVE", NOT: { id: routeId } },
+    data: { status: "SUPERSEDED", isActive: false },
+  });
+
+  const trip = await tx.trip.findUniqueOrThrow({ where: { id: tripId } });
+  const result = await tx.trip.updateMany({
+    where: { id: tripId, version: trip.version },
+    data: {
+      activeRouteId: routeId,
+      version: { increment: 1 },
+      updatedById: userId ?? undefined,
+    },
+  });
+  if (result.count === 0) {
+    throw new ConflictError("Trip was modified by someone else while activating this route");
+  }
+}
+
 export async function updateRouteStatus(
   tenantId: string,
   id: string,
@@ -182,19 +216,26 @@ export async function updateRouteStatus(
     throw new BadRequestError(`Cannot transition route from ${route.status} to ${newStatus}`);
   }
 
-  const result = await prisma.route.updateMany({
-    where: { id, version: expectedVersion },
-    data: {
-      status: newStatus,
-      version: { increment: 1 },
-      updatedById: userId ?? undefined,
-    },
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.route.updateMany({
+      where: { id, version: expectedVersion },
+      data: {
+        status: newStatus,
+        isActive: newStatus === "ACTIVE" || newStatus === "DRAFT" || newStatus === "PLANNED",
+        version: { increment: 1 },
+        updatedById: userId ?? undefined,
+      },
+    });
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Route was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
+
+    if (newStatus === "ACTIVE" && route.tripId) {
+      await activateRouteForTrip(tx, tenantId, route.tripId, id, userId);
+    }
   });
-  if (result.count === 0) {
-    throw new ConflictError(
-      `Route was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
 
   const updated = await findScopedRoute(tenantId, id);
 
@@ -285,31 +326,33 @@ export async function createRouteVersion(
 export async function activateRouteVersion(
   tenantId: string,
   routeId: string,
+  expectedVersion: number,
   userId: string | null
 ) {
   const newActiveRoute = await findScopedRoute(tenantId, routeId);
 
-  if (newActiveRoute.tripId) {
-    await prisma.route.updateMany({
-      where: {
-        tenantId,
-        tripId: newActiveRoute.tripId,
-        status: "ACTIVE",
-      },
+  await prisma.$transaction(async (tx) => {
+    const result = await tx.route.updateMany({
+      where: { id: routeId, version: expectedVersion },
       data: {
-        status: "SUPERSEDED",
+        status: "ACTIVE",
+        isActive: true,
+        version: { increment: 1 },
+        updatedById: userId ?? undefined,
       },
     });
-  }
+    if (result.count === 0) {
+      throw new ConflictError(
+        `Route was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
 
-  const activated = await prisma.route.update({
-    where: { id: routeId },
-    data: {
-      status: "ACTIVE",
-      updatedById: userId ?? undefined,
-    },
-    include: ROUTE_INCLUDE,
+    if (newActiveRoute.tripId) {
+      await activateRouteForTrip(tx, tenantId, newActiveRoute.tripId, routeId, userId);
+    }
   });
+
+  const activated = await findScopedRoute(tenantId, routeId);
 
   domainEvents.emitTyped("route.activated", {
     routeId,
