@@ -3,6 +3,7 @@ import type { TripEventPayloads } from "./domainEvents/tripEventPayloads";
 import type { RouteEventPayloads } from "./domainEvents/routeEventPayloads";
 import type { ManifestEventPayloads } from "./domainEvents/manifestEventPayloads";
 import type { HandoverEventPayloads } from "./domainEvents/handoverEventPayloads";
+import type { ReconciliationEventPayloads } from "./domainEvents/reconciliationEventPayloads";
 
 // The extension point for a future notification/billing/routing/tracking/
 // analytics integration -- not an implementation of those consumers. Emit
@@ -28,7 +29,7 @@ export interface TaskEventPayloads {
   "task.exception_resolved": { taskId?: string; tripId?: string; manifestId?: string; tenantId: string; exceptionId: string };
 }
 
-export interface DomainEventPayloads extends TaskEventPayloads, TripEventPayloads, RouteEventPayloads, ManifestEventPayloads, HandoverEventPayloads {}
+export interface DomainEventPayloads extends TaskEventPayloads, TripEventPayloads, RouteEventPayloads, ManifestEventPayloads, HandoverEventPayloads, ReconciliationEventPayloads {}
 
 class TypedDomainEvents extends EventEmitter {
   emitTyped<K extends keyof DomainEventPayloads>(event: K, payload: DomainEventPayloads[K]): boolean {

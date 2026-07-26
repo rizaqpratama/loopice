@@ -1,16 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { Combobox } from "@/components/ui/combobox";
 import { createTrip } from "@/api/trips.api";
-import { listStations } from "@/api/stations.api";
-import { listVehicles } from "@/api/vehicles.api";
-import { listDrivers } from "@/api/drivers.api";
 import { TRIP_TYPES, TRANSFER_TYPES } from "@loopice/shared";
 
 export function TripCreatePage() {
@@ -27,41 +23,28 @@ export function TripCreatePage() {
     plannedStartTime: "",
     plannedEndTime: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const { data: facilities = [] } = useQuery({
-    queryKey: ["stations"],
-    queryFn: () => listStations(),
-  });
-
-  const { data: vehicles = [] } = useQuery({
-    queryKey: ["vehicles"],
-    queryFn: () => listVehicles(),
-  });
-
-  const { data: drivers = [] } = useQuery({
-    queryKey: ["drivers"],
-    queryFn: () => listDrivers(),
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (data: any) => createTrip(data),
-    onSuccess: (res: any) => {
-      navigate(`/trips/${res.id}`);
-    },
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate({
-      tripType: formData.tripType,
-      transferType: isFacilityTransfer ? formData.transferType : undefined,
-      originFacilityId: formData.originFacilityId || undefined,
-      destinationFacilityId: formData.destinationFacilityId || undefined,
-      vehicleId: formData.vehicleId || undefined,
-      primaryDriverId: formData.primaryDriverId || undefined,
-      plannedStartTime: formData.plannedStartTime || undefined,
-      plannedEndTime: formData.plannedEndTime || undefined,
-    });
+    setIsSubmitting(true);
+    try {
+      const res = await createTrip({
+        tripType: formData.tripType as any,
+        transferType: isFacilityTransfer ? (formData.transferType as any) : undefined,
+        originFacilityId: formData.originFacilityId || undefined,
+        destinationFacilityId: formData.destinationFacilityId || undefined,
+        vehicleId: formData.vehicleId || undefined,
+        primaryDriverId: formData.primaryDriverId || undefined,
+        plannedStartTime: formData.plannedStartTime || undefined,
+        plannedEndTime: formData.plannedEndTime || undefined,
+      });
+      navigate(`/trips/${res.id}`);
+    } catch (err) {
+      alert(t("common.error"));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -78,115 +61,120 @@ export function TripCreatePage() {
               onChange={(e) => setIsFacilityTransfer(e.target.checked)}
               className="rounded"
             />
-            <label htmlFor="facility-transfer" className="text-sm font-medium">
+            <Label htmlFor="facility-transfer" className="text-sm font-medium">
               {t("trip.facilityTransfer")}
-            </label>
+            </Label>
           </div>
 
           {isFacilityTransfer ? (
             <>
-              <Select
-                label={t("trip.transferType")}
-                options={TRANSFER_TYPES.map((t) => ({
-                  value: t,
-                  label: t,
-                }))}
-                value={formData.transferType}
-                onChange={(value) =>
-                  setFormData({ ...formData, transferType: value })
-                }
-                required
-              />
-              <Combobox
-                label={t("trip.originFacility")}
-                options={facilities.map((f: any) => ({
-                  value: f.id,
-                  label: f.name,
-                }))}
-                value={formData.originFacilityId}
-                onChange={(value) =>
-                  setFormData({ ...formData, originFacilityId: value })
-                }
-                required
-              />
-              <Combobox
-                label={t("trip.destinationFacility")}
-                options={facilities.map((f: any) => ({
-                  value: f.id,
-                  label: f.name,
-                }))}
-                value={formData.destinationFacilityId}
-                onChange={(value) =>
-                  setFormData({ ...formData, destinationFacilityId: value })
-                }
-                required
-              />
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="transfer-type">{t("trip.transferType")}</Label>
+                <Select
+                  id="transfer-type"
+                  value={formData.transferType}
+                  onChange={(e) => setFormData({ ...formData, transferType: e.target.value })}
+                  required
+                >
+                  <option value="">{t("common.select")}</option>
+                  {TRANSFER_TYPES.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="origin">{t("trip.originFacility")}</Label>
+                <Input
+                  id="origin"
+                  value={formData.originFacilityId}
+                  onChange={(e) => setFormData({ ...formData, originFacilityId: e.target.value })}
+                  placeholder={t("common.facilityId")}
+                  required
+                />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label htmlFor="destination">{t("trip.destinationFacility")}</Label>
+                <Input
+                  id="destination"
+                  value={formData.destinationFacilityId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, destinationFacilityId: e.target.value })
+                  }
+                  placeholder={t("common.facilityId")}
+                  required
+                />
+              </div>
             </>
           ) : (
-            <Select
-              label={t("trip.type")}
-              options={TRIP_TYPES.map((t) => ({
-                value: t,
-                label: t(`trip.type.${t}`),
-              }))}
-              value={formData.tripType}
-              onChange={(value) =>
-                setFormData({ ...formData, tripType: value })
-              }
-              required
-            />
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="trip-type">{t("trip.type")}</Label>
+              <Select
+                id="trip-type"
+                value={formData.tripType}
+                onChange={(e) => setFormData({ ...formData, tripType: e.target.value })}
+                required
+              >
+                {TRIP_TYPES.map((type) => (
+                  <option key={type} value={type}>
+                    {t(`trip.type.${type}`)}
+                  </option>
+                ))}
+              </Select>
+            </div>
           )}
 
-          <Combobox
-            label={t("trip.vehicle")}
-            options={vehicles.map((v: any) => ({
-              value: v.id,
-              label: v.licensePlate,
-            }))}
-            value={formData.vehicleId}
-            onChange={(value) => setFormData({ ...formData, vehicleId: value })}
-          />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="vehicle">{t("trip.vehicle")}</Label>
+            <Input
+              id="vehicle"
+              value={formData.vehicleId}
+              onChange={(e) => setFormData({ ...formData, vehicleId: e.target.value })}
+              placeholder={t("common.vehicleId")}
+            />
+          </div>
 
-          <Combobox
-            label={t("trip.driver")}
-            options={drivers.map((d: any) => ({
-              value: d.id,
-              label: `${d.firstName} ${d.lastName}`,
-            }))}
-            value={formData.primaryDriverId}
-            onChange={(value) =>
-              setFormData({ ...formData, primaryDriverId: value })
-            }
-          />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="driver">{t("trip.driver")}</Label>
+            <Input
+              id="driver"
+              value={formData.primaryDriverId}
+              onChange={(e) => setFormData({ ...formData, primaryDriverId: e.target.value })}
+              placeholder={t("common.driverId")}
+            />
+          </div>
 
-          <Input
-            label={t("trip.plannedStartTime")}
-            type="datetime-local"
-            value={formData.plannedStartTime}
-            onChange={(e) =>
-              setFormData({ ...formData, plannedStartTime: e.target.value })
-            }
-          />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="start-time">{t("trip.plannedStartTime")}</Label>
+            <Input
+              id="start-time"
+              type="datetime-local"
+              value={formData.plannedStartTime}
+              onChange={(e) => setFormData({ ...formData, plannedStartTime: e.target.value })}
+            />
+          </div>
 
-          <Input
-            label={t("trip.plannedEndTime")}
-            type="datetime-local"
-            value={formData.plannedEndTime}
-            onChange={(e) =>
-              setFormData({ ...formData, plannedEndTime: e.target.value })
-            }
-          />
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="end-time">{t("trip.plannedEndTime")}</Label>
+            <Input
+              id="end-time"
+              type="datetime-local"
+              value={formData.plannedEndTime}
+              onChange={(e) => setFormData({ ...formData, plannedEndTime: e.target.value })}
+            />
+          </div>
 
           <div className="flex justify-end space-x-3">
             <Button
               type="button"
-              variant="secondary"
+              variant="outline"
               onClick={() => navigate("/trips")}
             >
               {t("common.cancel")}
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
-              {createMutation.isPending ? t("common.loading") : t("trip.create")}
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? t("common.loading") : t("trip.create")}
             </Button>
           </div>
         </form>

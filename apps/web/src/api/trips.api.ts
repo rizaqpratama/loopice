@@ -44,8 +44,13 @@ export function listTrips(params: { status?: TripStatus; driverId?: string; vehi
 
 export interface TripInput {
   tripType?: string;
+  transferType?: string;
   vehicleId?: string;
   primaryDriverId?: string;
+  originFacilityId?: string;
+  destinationFacilityId?: string;
+  plannedStartTime?: string;
+  plannedEndTime?: string;
   scheduledDate?: string;
   notes?: string;
 }
