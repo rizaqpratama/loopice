@@ -924,7 +924,7 @@ model Trip {
   parentTripId      String?
   parentTrip        Trip?   @relation("TripParentChild", fields: [parentTripId], references: [id])
   childTrips        Trip[]  @relation("TripParentChild")
-  replacementTripId String?
+  replacementTripId String? @unique
   replacementReason String?
 
   instructions String?
@@ -1416,6 +1416,7 @@ model FacilityHandover {
   createdBy   User?    @relation("HandoverCreatedBy", fields: [createdById], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  version     Int      @default(1)
 
   @@index([tenantId])
   @@index([tripId])
@@ -1452,6 +1453,7 @@ model ReceivingReconciliation {
   notes         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  version       Int       @default(1)
 
   @@index([tenantId])
   @@index([tripId])

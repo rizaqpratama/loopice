@@ -280,11 +280,213 @@ async function main() {
     }
   }
 
+  // -- Trip/Route/Manifest module fixtures --------------------------------
+  // Proves the module's migration actually deployed and its models are
+  // wired correctly end to end: a facility-transfer trip with an activated
+  // route, a sealed-adjacent manifest with items, a driver custody handover,
+  // and a receiving reconciliation in progress.
+
+  const facilitySupervisor = await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: tenant.id, email: "supervisor@acme.test" } },
+    update: {},
+    create: {
+      tenantId: tenant.id,
+      email: "supervisor@acme.test",
+      passwordHash,
+      firstName: "Farah",
+      lastName: "Supervisor",
+      role: "FACILITY_SUPERVISOR",
+    },
+  });
+
+  let driver = await prisma.driver.findFirst({ where: { tenantId: tenant.id, name: "Dedi Driver" } });
+  if (!driver) {
+    driver = await prisma.driver.create({
+      data: {
+        tenantId: tenant.id,
+        name: "Dedi Driver",
+        licenseNumber: "SIM-B2-000123",
+        phone: "081300000001",
+        status: "ACTIVE",
+        skills: ["LONG_HAUL"],
+        homeStationId: jakarta.id,
+      },
+    });
+  }
+
+  let vehicle = await prisma.vehicle.findFirst({ where: { tenantId: tenant.id, plateNumber: "B 1234 LP" } });
+  if (!vehicle) {
+    vehicle = await prisma.vehicle.create({
+      data: {
+        tenantId: tenant.id,
+        plateNumber: "B 1234 LP",
+        type: "BOX_TRUCK",
+        capacityKg: 5000,
+        capacityM3: 30,
+        capacityPallets: 12,
+        capabilities: ["DRY"],
+        status: "ACTIVE",
+        homeStationId: jakarta.id,
+      },
+    });
+  }
+
+  const existingTrip = await prisma.trip.findFirst({ where: { tenantId: tenant.id, tripNumber: "TRIP-000001" } });
+  if (!existingTrip && jakarta && bandung) {
+    const trip = await prisma.trip.create({
+      data: {
+        tenantId: tenant.id,
+        tripNumber: "TRIP-000001",
+        tripType: "INTER_FACILITY",
+        transferType: "WAREHOUSE_TRANSFER",
+        status: "DRAFT",
+        vehicleId: vehicle.id,
+        primaryDriverId: driver.id,
+        originFacilityId: jakarta.id,
+        destinationFacilityId: bandung.id,
+        vehicleCapacityKg: vehicle.capacityKg,
+        vehicleCapacityM3: vehicle.capacityM3,
+        vehicleCapacityPallets: vehicle.capacityPallets,
+        createdById: dispatcher.id,
+      },
+    });
+    await prisma.tripStatusHistory.create({
+      data: { tripId: trip.id, status: "DRAFT", changedById: dispatcher.id },
+    });
+
+    const route = await prisma.route.create({
+      data: {
+        tenantId: tenant.id,
+        routeNumber: "RT-000001",
+        name: "Jakarta -> Bandung Transfer",
+        tripId: trip.id,
+        status: "ACTIVE",
+        source: "MANUAL",
+        totalStops: 2,
+        createdById: dispatcher.id,
+      },
+    });
+
+    const originStop = await prisma.routeStop.create({
+      data: {
+        tenantId: tenant.id,
+        routeId: route.id,
+        sequenceNumber: 1,
+        stopType: "ORIGIN_FACILITY",
+        status: "PLANNED",
+        facilityId: jakarta.id,
+      },
+    });
+    const destinationStop = await prisma.routeStop.create({
+      data: {
+        tenantId: tenant.id,
+        routeId: route.id,
+        sequenceNumber: 2,
+        stopType: "DESTINATION_FACILITY",
+        status: "PLANNED",
+        facilityId: bandung.id,
+      },
+    });
+
+    await prisma.trip.update({ where: { id: trip.id }, data: { activeRouteId: route.id } });
+
+    const loadingTaskType = await prisma.taskTypeConfig.findUniqueOrThrow({
+      where: { tenantId_code: { tenantId: tenant.id, code: "LOADING" } },
+    });
+    const loadingTask = await prisma.task.create({
+      data: {
+        tenantId: tenant.id,
+        taskNumber: "TASK-SEED-000001",
+        taskTypeId: loadingTaskType.id,
+        status: "UNASSIGNED",
+        tripId: trip.id,
+        routeId: route.id,
+        stopId: originStop.id,
+        facilityId: jakarta.id,
+        createdById: dispatcher.id,
+      },
+    });
+    await prisma.routeStopTask.create({
+      data: {
+        tenantId: tenant.id,
+        routeStopId: originStop.id,
+        taskId: loadingTask.id,
+        assignmentStatus: "ASSIGNED",
+        assignedAt: new Date(),
+        createdById: dispatcher.id,
+      },
+    });
+
+    const manifest = await prisma.manifest.create({
+      data: {
+        tenantId: tenant.id,
+        manifestNumber: "MFT-000001",
+        tripId: trip.id,
+        originFacilityId: jakarta.id,
+        destinationFacilityId: bandung.id,
+        status: "LOADING",
+        plannedItemCount: 2,
+      },
+    });
+    await prisma.manifestStatusHistory.create({
+      data: { manifestId: manifest.id, status: "LOADING", changedById: dispatcher.id },
+    });
+    await prisma.manifestItem.createMany({
+      data: [
+        {
+          tenantId: tenant.id,
+          manifestId: manifest.id,
+          itemType: "PALLET",
+          identifier: "PLT-000001",
+          plannedQuantity: 4,
+          weight: 320,
+        },
+        {
+          tenantId: tenant.id,
+          manifestId: manifest.id,
+          itemType: "CARTON",
+          identifier: "CTN-000001",
+          plannedQuantity: 10,
+          weight: 80,
+        },
+      ],
+    });
+    await prisma.trip.update({ where: { id: trip.id }, data: { manifestId: manifest.id } });
+
+    await prisma.facilityHandover.create({
+      data: {
+        tenantId: tenant.id,
+        tripId: trip.id,
+        manifestId: manifest.id,
+        handoverType: "ORIGIN_TO_DRIVER",
+        facilityId: jakarta.id,
+        fromActorType: "FACILITY",
+        toActorType: "DRIVER",
+        toActorId: driver.id,
+        status: "PENDING",
+        expectedItemCount: 2,
+        createdById: dispatcher.id,
+      },
+    });
+
+    await prisma.receivingReconciliation.create({
+      data: {
+        tenantId: tenant.id,
+        tripId: trip.id,
+        manifestId: manifest.id,
+        destinationFacilityId: bandung.id,
+        status: "PENDING",
+        expectedItemCount: 2,
+      },
+    });
+  }
+
   console.log("Seed complete:");
   console.log(`  SuperAdmin: superadmin@loopice.dev / ${DEMO_PASSWORD}`);
   console.log(`  Tenant: ${tenant.name} (${tenant.subdomain})`);
   console.log(`  TenantAdmin: admin@acme.test / ${DEMO_PASSWORD}`);
   console.log(`  Dispatcher: dispatcher@acme.test / ${DEMO_PASSWORD}`);
+  console.log(`  FacilitySupervisor: supervisor@acme.test / ${DEMO_PASSWORD}`);
 }
 
 main()
