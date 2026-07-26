@@ -46,6 +46,13 @@ manifestsFlatRoutes.patch(
   asyncHandler(controller.seal)
 );
 
+// Close (post-receiving; independent of trip status)
+manifestsFlatRoutes.patch(
+  "/:id/close",
+  requireRole([...WRITE_ROLES]),
+  asyncHandler(controller.close)
+);
+
 // Dispatch checklist and dispatch
 manifestsFlatRoutes.get(
   "/:tripId/dispatch-check",

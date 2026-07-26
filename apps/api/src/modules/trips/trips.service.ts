@@ -654,6 +654,7 @@ export async function removeTaskFromTrip(
 export interface DispatchCheckResult {
   ready: boolean;
   blockers: string[];
+  capacity?: { withinLimits: boolean; utilizationPct: number | null };
 }
 
 // Also exported as computeDispatchChecklist so other modules (e.g.
@@ -700,9 +701,23 @@ export async function getDispatchChecklist(
     }
   }
 
+  let capacity: DispatchCheckResult["capacity"];
+  if (trip.activeManifest && trip.vehicleCapacityKg) {
+    const loadedWeight = trip.activeManifest.loadedWeight ?? 0;
+    const utilizationPct = (loadedWeight / trip.vehicleCapacityKg) * 100;
+    const withinLimits = loadedWeight <= trip.vehicleCapacityKg;
+    capacity = { withinLimits, utilizationPct };
+    if (!withinLimits) {
+      blockers.push(
+        `Manifest loaded weight (${loadedWeight}kg) exceeds vehicle capacity (${trip.vehicleCapacityKg}kg)`
+      );
+    }
+  }
+
   return {
     ready: blockers.length === 0,
     blockers,
+    capacity,
   };
 }
 

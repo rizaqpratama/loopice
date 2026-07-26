@@ -3,6 +3,7 @@ import { prisma } from "../../db/prisma";
 import { domainEvents } from "../../lib/domainEvents";
 import { recordAudit } from "../../lib/auditLog";
 import { BadRequestError, ConflictError, ForbiddenError, NotFoundError } from "../../lib/httpError";
+import { closeManifestInTx } from "../manifests/manifests.service";
 
 const RECONCILIATION_INCLUDE = {
   trip: true,
@@ -272,6 +273,31 @@ export async function completeReconciliation(
       afterValue: { status: "COMPLETED" },
       actorId: userId,
     });
+
+    // Completing reconciliation closes the manifest. Nothing else mirrors
+    // the reconciliation's MATCHED/DISCREPANCY outcome onto Manifest.status
+    // (a separate state machine), so bridge it here before closing --
+    // matching canTransitionManifestStatus's RECONCILING -> {MATCHED,
+    // DISCREPANCY} -> CLOSED path. A manifest that never reached RECONCILING
+    // (e.g. this reconciliation was cancelled before any counts were
+    // recorded) is left alone.
+    const manifest = await tx.manifest.findUnique({ where: { id: reconciliation.manifestId } });
+    if (manifest) {
+      const reconciliationOutcome = reconciliation.status === "DISCREPANCY" ? "DISCREPANCY" : "MATCHED";
+      let manifestVersion = manifest.version;
+
+      if (manifest.status === "RECONCILING") {
+        const bridged = await tx.manifest.update({
+          where: { id: manifest.id },
+          data: { status: reconciliationOutcome, version: { increment: 1 } },
+        });
+        manifestVersion = bridged.version;
+      }
+
+      if (manifest.status === "RECONCILING" || manifest.status === "MATCHED" || manifest.status === "DISCREPANCY") {
+        await closeManifestInTx(tx, tenantId, manifest.id, manifestVersion, userId);
+      }
+    }
   });
 
   const updated = await findScopedReconciliation(tenantId, reconciliationId);

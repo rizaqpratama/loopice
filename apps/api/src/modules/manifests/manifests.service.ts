@@ -7,7 +7,12 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../../db/prisma";
 import { domainEvents } from "../../lib/domainEvents";
 import { BadRequestError, ConflictError, NotFoundError } from "../../lib/httpError";
+import { recordAudit } from "../../lib/auditLog";
 import { getDispatchChecklist as computeDispatchChecklist } from "../trips/trips.service";
+
+// Utilization above this fraction of vehicle capacity triggers a soft
+// warning (returned to the caller, not an error) rather than a hard block.
+const CAPACITY_WARNING_THRESHOLD = 0.9;
 
 const MANIFEST_INCLUDE = {
   trip: true,
@@ -126,6 +131,13 @@ export interface AddManifestItemInput {
   weight?: number;
   volume?: number;
   notes?: string;
+  override?: boolean;
+  overrideReason?: string;
+}
+
+export interface AddManifestItemResult {
+  item: Awaited<ReturnType<typeof prisma.manifestItem.create>>;
+  capacityWarning?: string;
 }
 
 export async function addManifestItem(
@@ -133,7 +145,7 @@ export async function addManifestItem(
   manifestId: string,
   input: AddManifestItemInput,
   userId: string | null
-) {
+): Promise<AddManifestItemResult> {
   const manifest = await findScopedManifest(tenantId, manifestId);
 
   if (input.shipmentId) {
@@ -143,22 +155,75 @@ export async function addManifestItem(
     if (!shipment) throw new BadRequestError("Shipment not found");
   }
 
-  const created = await prisma.manifestItem.create({
-    data: {
-      tenantId,
-      manifestId,
-      shipmentId: input.shipmentId,
-      cargoItemId: input.cargoItemId,
-      handlingUnitId: input.handlingUnitId,
-      itemType: input.itemType ?? "SHIPMENT",
-      identifier: input.identifier,
-      plannedQuantity: input.plannedQuantity,
-      weight: input.weight,
-      volume: input.volume,
-      notes: input.notes,
-      loadingStatus: "PLANNED",
-      receivingStatus: "PENDING",
-    },
+  const trip = await prisma.trip.findFirst({ where: { id: manifest.tripId, tenantId } });
+
+  let capacityWarning: string | undefined;
+
+  if (trip) {
+    const existingTotals = await prisma.manifestItem.aggregate({
+      where: { manifestId },
+      _sum: { weight: true, volume: true },
+    });
+    const projectedWeight = (existingTotals._sum.weight ?? 0) + (input.weight ?? 0);
+    const projectedVolume = (existingTotals._sum.volume ?? 0) + (input.volume ?? 0);
+
+    const checks: Array<{ label: string; projected: number; capacity: number | null }> = [
+      { label: "weight", projected: projectedWeight, capacity: trip.vehicleCapacityKg },
+      { label: "volume", projected: projectedVolume, capacity: trip.vehicleCapacityM3 },
+    ];
+
+    for (const check of checks) {
+      if (check.capacity == null || check.capacity <= 0) continue;
+      const utilization = check.projected / check.capacity;
+      if (utilization > 1) {
+        if (!input.override) {
+          throw new BadRequestError(
+            `Adding this item would exceed vehicle ${check.label} capacity ` +
+              `(${check.projected} / ${check.capacity}). Pass override + overrideReason to proceed anyway.`
+          );
+        }
+        if (!input.overrideReason) {
+          throw new BadRequestError("overrideReason is required when override is true");
+        }
+      } else if (utilization > CAPACITY_WARNING_THRESHOLD) {
+        capacityWarning = `Manifest is at ${Math.round(utilization * 100)}% of vehicle ${check.label} capacity`;
+      }
+    }
+  }
+
+  const created = await prisma.$transaction(async (tx) => {
+    const item = await tx.manifestItem.create({
+      data: {
+        tenantId,
+        manifestId,
+        shipmentId: input.shipmentId,
+        cargoItemId: input.cargoItemId,
+        handlingUnitId: input.handlingUnitId,
+        itemType: input.itemType ?? "SHIPMENT",
+        identifier: input.identifier,
+        plannedQuantity: input.plannedQuantity,
+        weight: input.weight,
+        volume: input.volume,
+        notes: input.notes,
+        loadingStatus: "PLANNED",
+        receivingStatus: "PENDING",
+      },
+    });
+
+    if (input.override) {
+      await recordAudit(tx, {
+        tenantId,
+        entityType: "Manifest",
+        entityId: manifestId,
+        action: "CAPACITY_OVERRIDE",
+        reason: input.overrideReason,
+        isOverride: true,
+        afterValue: { itemId: item.id, weight: input.weight, volume: input.volume },
+        actorId: userId,
+      });
+    }
+
+    return item;
   });
 
   domainEvents.emitTyped("manifest.item_added", {
@@ -167,7 +232,7 @@ export async function addManifestItem(
     itemId: created.id,
   });
 
-  return created;
+  return { item: created, capacityWarning };
 }
 
 export async function updateManifestItemLoading(
@@ -178,22 +243,41 @@ export async function updateManifestItemLoading(
   expectedVersion: number,
   userId: string | null
 ) {
-  const manifest = await findScopedManifest(tenantId, manifestId);
-
-  if (manifest.version !== expectedVersion) {
-    throw new ConflictError(
-      `Manifest was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
-
   const item = await prisma.manifestItem.findFirst({
     where: { id: itemId, manifestId, tenantId },
   });
   if (!item) throw new NotFoundError("Manifest item not found");
 
-  const updated = await prisma.manifestItem.update({
-    where: { id: itemId },
-    data: { loadingStatus: loadingStatus as any },
+  const updated = await prisma.$transaction(async (tx) => {
+    const versionResult = await tx.manifest.updateMany({
+      where: { id: manifestId, version: expectedVersion },
+      data: { version: { increment: 1 }, updatedById: userId ?? undefined },
+    });
+    if (versionResult.count === 0) {
+      throw new ConflictError(
+        `Manifest was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
+
+    const result = await tx.manifestItem.update({
+      where: { id: itemId },
+      data: { loadingStatus: loadingStatus as any },
+    });
+
+    const loadedItems = await tx.manifestItem.findMany({
+      where: { manifestId, loadingStatus: "LOADED" },
+      select: { weight: true, volume: true },
+    });
+    await tx.manifest.update({
+      where: { id: manifestId },
+      data: {
+        loadedItemCount: loadedItems.length,
+        loadedWeight: loadedItems.reduce((sum, i) => sum + (i.weight ?? 0), 0),
+        loadedVolume: loadedItems.reduce((sum, i) => sum + (i.volume ?? 0), 0),
+      },
+    });
+
+    return result;
   });
 
   if (loadingStatus === "LOADED") {
@@ -215,22 +299,26 @@ export async function updateManifestItemReceiving(
   expectedVersion: number,
   userId: string | null
 ) {
-  const manifest = await findScopedManifest(tenantId, manifestId);
-
-  if (manifest.version !== expectedVersion) {
-    throw new ConflictError(
-      `Manifest was modified by someone else (expected version ${expectedVersion})`
-    );
-  }
-
   const item = await prisma.manifestItem.findFirst({
     where: { id: itemId, manifestId, tenantId },
   });
   if (!item) throw new NotFoundError("Manifest item not found");
 
-  const updated = await prisma.manifestItem.update({
-    where: { id: itemId },
-    data: { receivingStatus: receivingStatus as any },
+  const updated = await prisma.$transaction(async (tx) => {
+    const versionResult = await tx.manifest.updateMany({
+      where: { id: manifestId, version: expectedVersion },
+      data: { version: { increment: 1 }, updatedById: userId ?? undefined },
+    });
+    if (versionResult.count === 0) {
+      throw new ConflictError(
+        `Manifest was modified by someone else (expected version ${expectedVersion})`
+      );
+    }
+
+    return tx.manifestItem.update({
+      where: { id: itemId },
+      data: { receivingStatus: receivingStatus as any },
+    });
   });
 
   if (receivingStatus === "RECEIVED") {
@@ -400,4 +488,69 @@ export async function deleteManifestItem(
   await prisma.manifestItem.delete({
     where: { id: itemId },
   });
+}
+
+// Called both from the PATCH /manifests/:id/close endpoint and, inside its
+// own transaction, from receivingReconciliation.service.ts's
+// completeReconciliation -- callers that already hold a tx pass it via `tx`
+// so closing the manifest happens atomically with completing reconciliation.
+export async function closeManifestInTx(
+  tx: Prisma.TransactionClient,
+  tenantId: string,
+  manifestId: string,
+  expectedVersion: number,
+  userId: string | null
+) {
+  const manifest = await tx.manifest.findFirst({ where: { id: manifestId, tenantId } });
+  if (!manifest) throw new NotFoundError("Manifest not found");
+
+  if (!canTransitionManifestStatus(manifest.status, "CLOSED")) {
+    throw new BadRequestError(`Cannot close manifest from status ${manifest.status}`);
+  }
+
+  const result = await tx.manifest.updateMany({
+    where: { id: manifestId, version: expectedVersion },
+    data: {
+      status: "CLOSED",
+      closedAt: new Date(),
+      version: { increment: 1 },
+      updatedById: userId ?? undefined,
+    },
+  });
+  if (result.count === 0) {
+    throw new ConflictError(
+      `Manifest was modified by someone else (expected version ${expectedVersion})`
+    );
+  }
+
+  await recordAudit(tx, {
+    tenantId,
+    entityType: "Manifest",
+    entityId: manifestId,
+    action: "MANIFEST_CLOSED",
+    beforeValue: { status: manifest.status },
+    afterValue: { status: "CLOSED" },
+    actorId: userId,
+  });
+}
+
+export async function closeManifest(
+  tenantId: string,
+  manifestId: string,
+  expectedVersion: number,
+  userId: string | null
+) {
+  await prisma.$transaction(async (tx) => {
+    await closeManifestInTx(tx, tenantId, manifestId, expectedVersion, userId);
+  });
+
+  const updated = await findScopedManifest(tenantId, manifestId);
+
+  domainEvents.emitTyped("manifest.closed", {
+    manifestId,
+    tenantId,
+    tripId: updated.tripId,
+  });
+
+  return updated;
 }

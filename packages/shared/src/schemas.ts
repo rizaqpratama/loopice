@@ -545,17 +545,24 @@ export const createManifestSchema = z.object({
   destinationFacilityId: z.string().min(1),
 });
 
-export const addManifestItemSchema = z.object({
-  shipmentId: z.string().optional(),
-  cargoItemId: z.string().optional(),
-  handlingUnitId: z.string().optional(),
-  itemType: z.enum(MANIFEST_ITEM_TYPES).optional(),
-  identifier: z.string().optional(),
-  plannedQuantity: z.number().int().positive().optional(),
-  weight: z.number().positive().optional(),
-  volume: z.number().positive().optional(),
-  notes: z.string().optional(),
-});
+export const addManifestItemSchema = z
+  .object({
+    shipmentId: z.string().optional(),
+    cargoItemId: z.string().optional(),
+    handlingUnitId: z.string().optional(),
+    itemType: z.enum(MANIFEST_ITEM_TYPES).optional(),
+    identifier: z.string().optional(),
+    plannedQuantity: z.number().int().positive().optional(),
+    weight: z.number().positive().optional(),
+    volume: z.number().positive().optional(),
+    notes: z.string().optional(),
+    override: z.boolean().optional(),
+    overrideReason: z.string().optional(),
+  })
+  .refine((data) => !data.override || !!data.overrideReason, {
+    message: "overrideReason is required when override is true",
+    path: ["overrideReason"],
+  });
 
 export const updateManifestItemLoadingSchema = z.object({
   loadingStatus: z.string().min(1),
@@ -569,6 +576,10 @@ export const updateManifestItemReceivingSchema = z.object({
 
 export const sealManifestSchema = z.object({
   sealNumber: z.string().min(1),
+  expectedVersion: z.number().int(),
+});
+
+export const closeManifestSchema = z.object({
   expectedVersion: z.number().int(),
 });
 

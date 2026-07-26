@@ -5,6 +5,7 @@ import {
   updateManifestItemLoadingSchema,
   updateManifestItemReceivingSchema,
   sealManifestSchema,
+  closeManifestSchema,
 } from "@loopice/shared";
 import * as service from "./manifests.service";
 
@@ -47,9 +48,9 @@ export async function addItem(req: Request, res: Response) {
   const { id: manifestId } = req.params;
   const input = addManifestItemSchema.parse(req.body);
 
-  const item = await service.addManifestItem(tenantId(req), manifestId, input, userId(req));
+  const result = await service.addManifestItem(tenantId(req), manifestId, input, userId(req));
 
-  res.status(201).json(item);
+  res.status(201).json(result);
 }
 
 export async function updateItemLoading(req: Request, res: Response) {
@@ -100,6 +101,20 @@ export async function seal(req: Request, res: Response) {
     tenantId(req),
     manifestId,
     sealNumber,
+    expectedVersion,
+    userId(req)
+  );
+
+  res.json(manifest);
+}
+
+export async function close(req: Request, res: Response) {
+  const { id: manifestId } = req.params;
+  const { expectedVersion } = closeManifestSchema.parse(req.body);
+
+  const manifest = await service.closeManifest(
+    tenantId(req),
+    manifestId,
     expectedVersion,
     userId(req)
   );
