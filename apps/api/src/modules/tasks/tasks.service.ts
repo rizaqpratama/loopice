@@ -707,6 +707,118 @@ async function assertAvailability(
   }
 }
 
+async function assertTaskRouteable(
+  task: { taskType: { isRouteable: boolean } },
+  tripId: string | undefined
+) {
+  if (tripId && !task.taskType.isRouteable) {
+    throw new BadRequestError("Cannot assign non-routeable task to a trip");
+  }
+}
+
+async function assertTripCapacity(
+  tenantId: string,
+  tripId: string,
+  task: { id: string; shipmentLinks: Array<{ shipment: { weightKg: number | null } }> }
+) {
+  const trip = await prisma.trip.findFirst({
+    where: { id: tripId, tenantId },
+    include: {
+      activeManifest: {
+        include: { items: true },
+      },
+    },
+  });
+
+  if (!trip) throw new BadRequestError("Trip not found");
+
+  const taskWeight = task.shipmentLinks.reduce((sum, link) => sum + (link.shipment.weightKg ?? 0), 0);
+  const manifestWeight = trip.activeManifest?.items.reduce((sum, item) => sum + (item.weight ?? 0), 0) ?? 0;
+  const totalWeight = manifestWeight + taskWeight;
+
+  if (trip.vehicleCapacityKg && totalWeight > trip.vehicleCapacityKg) {
+    throw new BadRequestError(
+      `Task would exceed trip vehicle capacity (${totalWeight}kg > ${trip.vehicleCapacityKg}kg)`
+    );
+  }
+}
+
+async function assertFacilityStopMapping(
+  task: {
+    id: string;
+    facility: { id: string } | null;
+    taskType: { code: string };
+    shipmentLinks: Array<{ shipment: { type: string } }>;
+  },
+  stopId: string | undefined,
+  tenantId: string
+) {
+  if (!stopId) return;
+
+  const stop = await prisma.routeStop.findFirst({
+    where: { id: stopId, tenantId },
+    include: { route: { include: { trip: true } } },
+  });
+
+  if (!stop) throw new BadRequestError("Stop not found");
+
+  const taskCode = task.taskType?.code || "";
+  const isLoading = taskCode.includes("LOADING") || task.shipmentLinks.some((l) => l.shipment.type === "LOADING");
+  const isUnloading = taskCode.includes("UNLOADING") || task.shipmentLinks.some((l) => l.shipment.type === "UNLOADING");
+
+  if (isLoading && stop.route.trip) {
+    if (stop.route.trip.originFacilityId !== task.facility?.id) {
+      throw new BadRequestError("Loading task must be assigned to origin facility stop");
+    }
+  }
+
+  if (isUnloading && stop.route.trip) {
+    if (stop.route.trip.destinationFacilityId !== task.facility?.id) {
+      throw new BadRequestError("Unloading task must be assigned to destination facility stop");
+    }
+  }
+}
+
+async function assertPickupBeforeDelivery(
+  tenantId: string,
+  task: { id: string; taskType: { code: string }; shipmentLinks: Array<{ shipment: { id: string } }> },
+  tripId: string | undefined
+) {
+  if (!tripId) return;
+
+  const shipmentIds = task.shipmentLinks.map((l) => l.shipment.id);
+  if (shipmentIds.length === 0) return;
+
+  const otherTasksSameShipment = await prisma.task.findMany({
+    where: {
+      tripId,
+      id: { not: task.id },
+      shipmentLinks: { some: { shipmentId: { in: shipmentIds } } },
+      status: { in: ["ASSIGNED", "IN_PROGRESS", "COMPLETED"] },
+    },
+    include: {
+      taskType: true,
+      shipmentLinks: true,
+    },
+  });
+
+  for (const other of otherTasksSameShipment) {
+    const otherCode = other.taskType?.code || "";
+    const thisCode = task.taskType?.code || "";
+
+    const thisIsPickup = thisCode.includes("PICKUP") || thisCode.includes("LOADING");
+    const thisIsDelivery = thisCode.includes("DELIVERY") || thisCode.includes("UNLOADING");
+    const otherIsPickup = otherCode.includes("PICKUP") || otherCode.includes("LOADING");
+    const otherIsDelivery = otherCode.includes("DELIVERY") || otherCode.includes("UNLOADING");
+
+    if (thisIsDelivery && otherIsPickup) {
+      throw new BadRequestError(
+        "Delivery task cannot be assigned before pickup task for the same shipment"
+      );
+    }
+  }
+}
+
 export interface AssignTaskInput {
   assignedDriverId?: string;
   assignedVehicleId?: string;
@@ -754,6 +866,10 @@ export async function assignTask(
   if (!input.override) {
     assertCapabilityMatch(task, driver, vehicle);
     await assertAvailability(tenantId, task, input.assignedDriverId, input.assignedVehicleId);
+    await assertTaskRouteable(task, input.tripId);
+    if (input.tripId) await assertTripCapacity(tenantId, input.tripId, task);
+    await assertFacilityStopMapping(task, input.stopId, tenantId);
+    await assertPickupBeforeDelivery(tenantId, task, input.tripId);
   }
 
   const assigned = await prisma.$transaction(async (tx) => {
