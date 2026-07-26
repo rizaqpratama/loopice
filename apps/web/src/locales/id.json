@@ -472,5 +472,105 @@
     "switchLabel": "Ganti bahasa",
     "en": "English",
     "id": "Bahasa Indonesia"
+  },
+  "trip": {
+    "create": "Buat Perjalanan",
+    "list": "Perjalanan",
+    "tripNumber": "Perjalanan #",
+    "type": "Jenis Perjalanan",
+    "status": "Status",
+    "driver": "Pengemudi",
+    "driverPlaceholder": "Cari berdasarkan nama atau ID",
+    "vehicle": "Kendaraan",
+    "vehiclePlaceholder": "Cari berdasarkan plat nomor",
+    "originFacility": "Fasilitas Asal",
+    "destinationFacility": "Fasilitas Tujuan",
+    "plannedStartTime": "Jadwal Mulai",
+    "plannedEndTime": "Jadwal Berakhir",
+    "facilityTransfer": "Ini adalah transfer antar-fasilitas",
+    "manifest": "Manifest",
+    "items": "Item",
+    "noManifest": "Tidak ada manifest yang ditetapkan",
+    "route": "Rute",
+    "stops": "Pemberhentian",
+    "noRoute": "Tidak ada rute yang ditetapkan",
+    "tasks": "Tugas",
+    "noTasks": "Tidak ada tugas yang ditetapkan",
+    "type": {
+      "DIRECT_DELIVERY": "Pengiriman Langsung",
+      "PICKUP_RUN": "Rute Pengambilan",
+      "DELIVERY_RUN": "Rute Pengiriman",
+      "MILK_RUN": "Milk Run",
+      "LINEHAUL": "Linehaul",
+      "INTER_FACILITY": "Antar-Fasilitas",
+      "WAREHOUSE_TRANSFER": "Transfer Gudang",
+      "BRANCH_TRANSFER": "Transfer Cabang",
+      "CROSS_DOCK_TRANSFER": "Transfer Cross-Dock"
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "PLANNING": "Perencanaan",
+      "READY": "Siap",
+      "DISPATCHED": "Dikirim",
+      "IN_PROGRESS": "Sedang Berjalan",
+      "PAUSED": "Dijeda",
+      "ARRIVED": "Tiba",
+      "COMPLETED": "Selesai",
+      "PARTIALLY_COMPLETED": "Sebagian Selesai",
+      "FAILED": "Gagal",
+      "CANCELLED": "Dibatalkan"
+    }
+  },
+  "manifest": {
+    "status": {
+      "DRAFT": "Draft",
+      "PLANNED": "Direncanakan",
+      "LOADING": "Sedang Dimuat",
+      "LOADED": "Dimuat",
+      "SEALED": "Disegel",
+      "DISPATCHED": "Dikirim",
+      "IN_TRANSIT": "Dalam Perjalanan",
+      "ARRIVED": "Tiba",
+      "UNLOADING": "Sedang Dibongkar",
+      "RECEIVING": "Sedang Diterima",
+      "RECONCILING": "Sedang Direkonsiliasi",
+      "MATCHED": "Cocok",
+      "DISCREPANCY": "Ketidaksesuaian",
+      "CLOSED": "Ditutup",
+      "CANCELLED": "Dibatalkan"
+    }
+  },
+  "route": {
+    "status": {
+      "DRAFT": "Draft",
+      "PLANNED": "Direncanakan",
+      "ACTIVE": "Aktif",
+      "COMPLETED": "Selesai",
+      "SUPERSEDED": "Digantikan",
+      "CANCELLED": "Dibatalkan"
+    }
+  },
+  "handover": {
+    "status": {
+      "PENDING": "Tertunda",
+      "IN_PROGRESS": "Sedang Berlangsung",
+      "ACCEPTED": "Diterima",
+      "ACCEPTED_WITH_EXCEPTION": "Diterima dengan Pengecualian",
+      "REJECTED": "Ditolak",
+      "CANCELLED": "Dibatalkan"
+    }
+  },
+  "reconciliation": {
+    "status": {
+      "PENDING": "Tertunda",
+      "IN_PROGRESS": "Sedang Berlangsung",
+      "MATCHED": "Cocok",
+      "PARTIAL": "Sebagian",
+      "DISCREPANCY": "Ketidaksesuaian",
+      "UNDER_INVESTIGATION": "Sedang Diselidiki",
+      "RESOLVED": "Diselesaikan",
+      "COMPLETED": "Selesai",
+      "CANCELLED": "Dibatalkan"
+    }
   }
 }

@@ -473,5 +473,105 @@
     "switchLabel": "Switch language",
     "en": "English",
     "id": "Bahasa Indonesia"
+  },
+  "trip": {
+    "create": "Create Trip",
+    "list": "Trips",
+    "tripNumber": "Trip #",
+    "type": "Trip Type",
+    "status": "Status",
+    "driver": "Driver",
+    "driverPlaceholder": "Search by name or ID",
+    "vehicle": "Vehicle",
+    "vehiclePlaceholder": "Search by license plate",
+    "originFacility": "Origin Facility",
+    "destinationFacility": "Destination Facility",
+    "plannedStartTime": "Scheduled Start",
+    "plannedEndTime": "Scheduled End",
+    "facilityTransfer": "This is a facility-to-facility transfer",
+    "manifest": "Manifest",
+    "items": "Items",
+    "noManifest": "No manifest assigned",
+    "route": "Route",
+    "stops": "Stops",
+    "noRoute": "No route assigned",
+    "tasks": "Tasks",
+    "noTasks": "No tasks assigned",
+    "type": {
+      "DIRECT_DELIVERY": "Direct Delivery",
+      "PICKUP_RUN": "Pickup Run",
+      "DELIVERY_RUN": "Delivery Run",
+      "MILK_RUN": "Milk Run",
+      "LINEHAUL": "Linehaul",
+      "INTER_FACILITY": "Inter-Facility",
+      "WAREHOUSE_TRANSFER": "Warehouse Transfer",
+      "BRANCH_TRANSFER": "Branch Transfer",
+      "CROSS_DOCK_TRANSFER": "Cross-Dock Transfer"
+    },
+    "status": {
+      "DRAFT": "Draft",
+      "PLANNING": "Planning",
+      "READY": "Ready",
+      "DISPATCHED": "Dispatched",
+      "IN_PROGRESS": "In Progress",
+      "PAUSED": "Paused",
+      "ARRIVED": "Arrived",
+      "COMPLETED": "Completed",
+      "PARTIALLY_COMPLETED": "Partially Completed",
+      "FAILED": "Failed",
+      "CANCELLED": "Cancelled"
+    }
+  },
+  "manifest": {
+    "status": {
+      "DRAFT": "Draft",
+      "PLANNED": "Planned",
+      "LOADING": "Loading",
+      "LOADED": "Loaded",
+      "SEALED": "Sealed",
+      "DISPATCHED": "Dispatched",
+      "IN_TRANSIT": "In Transit",
+      "ARRIVED": "Arrived",
+      "UNLOADING": "Unloading",
+      "RECEIVING": "Receiving",
+      "RECONCILING": "Reconciling",
+      "MATCHED": "Matched",
+      "DISCREPANCY": "Discrepancy",
+      "CLOSED": "Closed",
+      "CANCELLED": "Cancelled"
+    }
+  },
+  "route": {
+    "status": {
+      "DRAFT": "Draft",
+      "PLANNED": "Planned",
+      "ACTIVE": "Active",
+      "COMPLETED": "Completed",
+      "SUPERSEDED": "Superseded",
+      "CANCELLED": "Cancelled"
+    }
+  },
+  "handover": {
+    "status": {
+      "PENDING": "Pending",
+      "IN_PROGRESS": "In Progress",
+      "ACCEPTED": "Accepted",
+      "ACCEPTED_WITH_EXCEPTION": "Accepted with Exception",
+      "REJECTED": "Rejected",
+      "CANCELLED": "Cancelled"
+    }
+  },
+  "reconciliation": {
+    "status": {
+      "PENDING": "Pending",
+      "IN_PROGRESS": "In Progress",
+      "MATCHED": "Matched",
+      "PARTIAL": "Partial",
+      "DISCREPANCY": "Discrepancy",
+      "UNDER_INVESTIGATION": "Under Investigation",
+      "RESOLVED": "Resolved",
+      "COMPLETED": "Completed",
+      "CANCELLED": "Cancelled"
+    }
   }
 }
