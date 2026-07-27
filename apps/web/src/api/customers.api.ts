@@ -1,3 +1,4 @@
+import type { ServiceOrderStatus } from "@loopice/shared";
 import { apiRequest } from "./client";
 
 export interface Customer {
@@ -12,8 +13,13 @@ export interface Customer {
   updatedAt: string;
 }
 
-export interface CustomerWithOrders extends Customer {
-  orders: Array<{ id: string; orderNumber: string; status: string; createdAt: string }>;
+export interface CustomerWithServiceOrders extends Customer {
+  serviceOrders: Array<{
+    id: string;
+    soNumber: string;
+    status: ServiceOrderStatus;
+    createdAt: string;
+  }>;
 }
 
 export interface PaginatedResult<T> {
@@ -35,7 +41,7 @@ export function listCustomers(params: ListCustomersParams = {}) {
 }
 
 export function getCustomer(id: string) {
-  return apiRequest<CustomerWithOrders>(`/customers/${id}`);
+  return apiRequest<CustomerWithServiceOrders>(`/customers/${id}`);
 }
 
 export interface CustomerInput {

@@ -1,72 +1,130 @@
 import * as React from "react";
-import { Link } from "react-router-dom";
-import type { OrderStatus } from "@loopice/shared";
-import { ORDER_STATUSES } from "@loopice/shared";
+import { useNavigate } from "react-router-dom";
+import { Boxes, Plus, Users } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import type { ServiceOrderStatus } from "@loopice/shared";
+import { SERVICE_ORDER_STATUSES } from "@loopice/shared";
 import * as customersApi from "@/api/customers.api";
-import * as ordersApi from "@/api/orders.api";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import * as serviceOrdersApi from "@/api/serviceOrders.api";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+
+// "Open" work -- not yet finished, billed, closed out, or cancelled.
+const OPEN_STATUSES: ServiceOrderStatus[] = [
+  "DRAFT",
+  "QUOTED",
+  "CONFIRMED",
+  "PLANNED",
+  "IN_PROGRESS",
+];
 
 export function DashboardPage() {
+  const navigate = useNavigate();
+  const { t } = useTranslation();
   const [totalCustomers, setTotalCustomers] = React.useState<number | null>(null);
-  const [statusCounts, setStatusCounts] = React.useState<Record<OrderStatus, number> | null>(null);
-  const [totalOrders, setTotalOrders] = React.useState<number | null>(null);
+  const [statusCounts, setStatusCounts] = React.useState<Record<ServiceOrderStatus, number> | null>(
+    null
+  );
+  const [totalServiceOrders, setTotalServiceOrders] = React.useState<number | null>(null);
+  const [totalShipmentUnits, setTotalShipmentUnits] = React.useState<number | null>(null);
 
   React.useEffect(() => {
     customersApi.listCustomers({ limit: 1 }).then((res) => setTotalCustomers(res.total));
 
-    ordersApi.listOrders({ limit: 100 }).then((res) => {
-      setTotalOrders(res.total);
-      const counts = Object.fromEntries(ORDER_STATUSES.map((s) => [s, 0])) as Record<
-        OrderStatus,
+    serviceOrdersApi.listServiceOrders({ limit: 100 }).then((res) => {
+      setTotalServiceOrders(res.total);
+      const counts = Object.fromEntries(SERVICE_ORDER_STATUSES.map((s) => [s, 0])) as Record<
+        ServiceOrderStatus,
         number
       >;
-      for (const order of res.items) counts[order.status]++;
+      let shipmentUnits = 0;
+      for (const so of res.items) {
+        counts[so.status]++;
+        for (const shipment of so.shipments) shipmentUnits += shipment.quantity;
+      }
       setStatusCounts(counts);
+      setTotalShipmentUnits(shipmentUnits);
     });
   }, []);
 
-  return (
-    <div className="flex flex-col gap-6">
-      <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
+  const openCount = statusCounts
+    ? OPEN_STATUSES.reduce((sum, s) => sum + statusCounts[s], 0)
+    : null;
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Total customers</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-foreground">{totalCustomers ?? "…"}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Total orders</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-foreground">{totalOrders ?? "…"}</p>
-          </CardContent>
-        </Card>
-        {ORDER_STATUSES.map((status) => (
-          <Card key={status}>
-            <CardHeader>
-              <CardTitle>{status.replace("_", " ")}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-3xl font-bold text-foreground">
-                {statusCounts ? statusCounts[status] : "…"}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            {t("dashboard.eyebrow")}
+          </p>
+          <h1 className="font-display text-3xl font-semibold tracking-tight text-foreground">
+            {t("dashboard.title")}
+          </h1>
+        </div>
+        <Button onClick={() => navigate("/service-orders/new")}>
+          <Plus className="h-4 w-4" strokeWidth={2.5} />
+          {t("dashboard.newServiceOrder")}
+        </Button>
       </div>
 
-      <div className="flex gap-3">
-        <Link to="/orders/new" className="text-sm font-medium text-brand-primary hover:underline">
-          + Create order
-        </Link>
-        <Link to="/customers" className="text-sm font-medium text-brand-primary hover:underline">
-          View customers
-        </Link>
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
+        {/* Featured stat -- the one number a dispatcher actually needs right now. */}
+        <div className="flex flex-col justify-between rounded-md bg-foreground p-6 text-background lg:col-span-2">
+          <div className="flex items-center gap-2 opacity-70">
+            <Boxes className="h-4 w-4" strokeWidth={2} />
+            <p className="font-mono text-xs uppercase tracking-[0.15em]">
+              {t("dashboard.openServiceOrders")}
+            </p>
+          </div>
+          <p className="font-display text-6xl font-semibold tabular-nums">{openCount ?? "—"}</p>
+          <p className="text-sm opacity-70">
+            {t("dashboard.openServiceOrdersSubtitle", { total: totalServiceOrders ?? "…" })}
+          </p>
+        </div>
+
+        {/* Ledger of every status, plus cargo units and customer count as reference. */}
+        <Card className="lg:col-span-3">
+          <div className="flex items-center justify-between border-b border-border px-5 py-3">
+            <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+              {t("dashboard.ledgerTitle")}
+            </p>
+            <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+              {totalServiceOrders ?? "…"} {t("common.total")}
+            </p>
+          </div>
+          <div className="divide-y divide-border">
+            {SERVICE_ORDER_STATUSES.map((status) => (
+              <div key={status} className="flex items-center justify-between px-5 py-3">
+                <span className="text-sm text-foreground">{t(`status.${status}`)}</span>
+                <span className="font-display text-lg font-semibold tabular-nums text-foreground">
+                  {statusCounts ? statusCounts[status] : "…"}
+                </span>
+              </div>
+            ))}
+            <div className="flex items-center justify-between px-5 py-3">
+              <span className="flex items-center gap-2 text-sm text-foreground">
+                <Boxes className="h-3.5 w-3.5 text-muted-foreground" strokeWidth={2} />
+                {t("dashboard.cargoUnits")}
+              </span>
+              <span className="font-display text-lg font-semibold tabular-nums text-foreground">
+                {totalShipmentUnits ?? "…"}
+              </span>
+            </div>
+            <button
+              onClick={() => navigate("/customers")}
+              className="flex w-full items-center justify-between px-5 py-3 text-left transition-colors hover:bg-muted"
+            >
+              <span className="flex items-center gap-2 text-sm text-brand-primary">
+                <Users className="h-3.5 w-3.5" strokeWidth={2} />
+                {t("dashboard.customersOnFile")}
+              </span>
+              <span className="font-display text-lg font-semibold tabular-nums text-foreground">
+                {totalCustomers ?? "…"}
+              </span>
+            </button>
+          </div>
+        </Card>
       </div>
     </div>
   );

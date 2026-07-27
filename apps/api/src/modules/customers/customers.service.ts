@@ -46,7 +46,7 @@ export async function createCustomer(tenantId: string, input: CustomerInput) {
 async function findScoped(tenantId: string, id: string) {
   const customer = await prisma.customer.findFirst({
     where: { id, tenantId },
-    include: { orders: { orderBy: { createdAt: "desc" } } },
+    include: { serviceOrders: { orderBy: { createdAt: "desc" } } },
   });
   if (!customer) throw new NotFoundError("Customer not found");
   return customer;
@@ -63,8 +63,8 @@ export async function updateCustomer(tenantId: string, id: string, input: Partia
 
 export async function deleteCustomer(tenantId: string, id: string) {
   const customer = await findScoped(tenantId, id);
-  if (customer.orders.length > 0) {
-    throw new BadRequestError("Cannot delete a customer with existing orders");
+  if (customer.serviceOrders.length > 0) {
+    throw new BadRequestError("Cannot delete a customer with existing service orders");
   }
   await prisma.customer.delete({ where: { id } });
 }

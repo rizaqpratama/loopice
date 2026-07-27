@@ -1,7 +1,10 @@
 import * as React from "react";
+import { Plus } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { AuthUser, UserRole } from "@loopice/shared";
 import * as usersApi from "@/api/users.api";
 import { ApiError } from "@/api/client";
+import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -12,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 const CREATABLE_ROLES: UserRole[] = ["TENANT_ADMIN", "DISPATCHER"];
 
 export function UserManagementPage() {
+  const { t } = useTranslation();
   const [users, setUsers] = React.useState<AuthUser[]>([]);
   const [showForm, setShowForm] = React.useState(false);
   const [form, setForm] = React.useState({
@@ -42,7 +46,7 @@ export function UserManagementPage() {
       setShowForm(false);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Failed to create user");
+      setError(err instanceof ApiError ? err.message : t("settings.users.failedToCreate"));
     } finally {
       setIsSubmitting(false);
     }
@@ -55,9 +59,25 @@ export function UserManagementPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-foreground">Users</h1>
-        <Button onClick={() => setShowForm((v) => !v)}>{showForm ? "Cancel" : "+ New user"}</Button>
+      <div className="flex items-end justify-between">
+        <div>
+          <p className="font-mono text-xs uppercase tracking-[0.15em] text-muted-foreground">
+            {t("settings.users.eyebrow")}
+          </p>
+          <h1 className="font-display text-2xl font-semibold tracking-tight text-foreground">
+            {t("settings.users.title")}
+          </h1>
+        </div>
+        <Button onClick={() => setShowForm((v) => !v)}>
+          {showForm ? (
+            t("common.cancel")
+          ) : (
+            <>
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              {t("settings.users.newUser")}
+            </>
+          )}
+        </Button>
       </div>
 
       {showForm && (
@@ -65,26 +85,26 @@ export function UserManagementPage() {
           <CardContent className="pt-4">
             <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <Input
-                placeholder="First name"
+                placeholder={t("settings.users.firstNamePlaceholder")}
                 required
                 value={form.firstName}
                 onChange={(e) => setForm({ ...form, firstName: e.target.value })}
               />
               <Input
-                placeholder="Last name"
+                placeholder={t("settings.users.lastNamePlaceholder")}
                 required
                 value={form.lastName}
                 onChange={(e) => setForm({ ...form, lastName: e.target.value })}
               />
               <Input
-                placeholder="Email"
+                placeholder={t("settings.users.emailPlaceholder")}
                 type="email"
                 required
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
               <Input
-                placeholder="Temporary password"
+                placeholder={t("settings.users.tempPasswordPlaceholder")}
                 type="password"
                 required
                 minLength={8}
@@ -97,13 +117,13 @@ export function UserManagementPage() {
               >
                 {CREATABLE_ROLES.map((role) => (
                   <option key={role} value={role}>
-                    {role}
+                    {t(`role.${role}`)}
                   </option>
                 ))}
               </Select>
               {error && <p className="text-sm text-destructive sm:col-span-2">{error}</p>}
               <Button type="submit" disabled={isSubmitting} className="sm:col-span-2">
-                {isSubmitting ? "Saving…" : "Create user"}
+                {isSubmitting ? t("common.saving") : t("settings.users.createUser")}
               </Button>
             </form>
           </CardContent>
@@ -114,10 +134,10 @@ export function UserManagementPage() {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>{t("settings.users.colName")}</TableHead>
+              <TableHead>{t("settings.users.colEmail")}</TableHead>
+              <TableHead>{t("settings.users.colRole")}</TableHead>
+              <TableHead>{t("settings.users.colStatus")}</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -125,19 +145,26 @@ export function UserManagementPage() {
             {users.map((user) => (
               <TableRow key={user.id}>
                 <TableCell>
-                  {user.firstName} {user.lastName}
+                  <div className="flex items-center gap-2.5 font-medium text-foreground">
+                    <Avatar name={`${user.firstName} ${user.lastName}`} size="sm" />
+                    {user.firstName} {user.lastName}
+                  </div>
                 </TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>{user.role}</TableCell>
+                <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                <TableCell>
+                  <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground">
+                    {t(`role.${user.role}`)}
+                  </span>
+                </TableCell>
                 <TableCell>
                   <Badge variant={user.isActive ? "success" : "secondary"}>
-                    {user.isActive ? "Active" : "Deactivated"}
+                    {user.isActive ? t("settings.users.active") : t("settings.users.deactivated")}
                   </Badge>
                 </TableCell>
                 <TableCell>
                   {user.isActive && (
                     <Button size="sm" variant="outline" onClick={() => handleDeactivate(user.id)}>
-                      Deactivate
+                      {t("settings.users.deactivate")}
                     </Button>
                   )}
                 </TableCell>

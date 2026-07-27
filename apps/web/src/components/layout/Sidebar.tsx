@@ -1,60 +1,160 @@
+import {
+  Building2,
+  ClipboardCheck,
+  LayoutDashboard,
+  LayoutGrid,
+  Package,
+  Palette,
+  Truck,
+  Users,
+  UsersRound,
+  Warehouse,
+} from "lucide-react";
 import { NavLink } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { RoleGate } from "@/components/RoleGate";
+import { useTenantBranding } from "@/context/TenantBrandingContext";
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { to: "/", label: "Dashboard", end: true },
-  { to: "/customers", label: "Customers" },
-  { to: "/orders", label: "Orders" },
+  { to: "/", key: "nav.dashboard", end: true, icon: LayoutDashboard },
+  { to: "/customers", key: "nav.customers", icon: Users },
+  { to: "/service-orders", key: "nav.serviceOrders", icon: Package },
+  { to: "/tasks", key: "nav.tasks", icon: ClipboardCheck },
+  { to: "/trips", key: "nav.trips", icon: Truck },
 ];
 
-export function Sidebar() {
+const dispatchItems = [{ to: "/dispatch", key: "nav.dispatchBoard", icon: LayoutGrid }];
+
+const facilityItems = [
+  { to: "/facilities/receiving", key: "nav.facilityReceiving", icon: Warehouse },
+];
+
+const settingsItems = [
+  { to: "/settings/branding", key: "nav.branding", icon: Palette },
+  { to: "/settings/users", key: "nav.users", icon: UsersRound },
+  { to: "/settings/stations", key: "nav.stations", icon: Warehouse },
+  { to: "/settings/task-types", key: "nav.taskTypes", icon: ClipboardCheck },
+  { to: "/settings/drivers", key: "nav.drivers", icon: Users },
+  { to: "/settings/vehicles", key: "nav.vehicles", icon: Truck },
+  { to: "/settings/teams", key: "nav.teams", icon: UsersRound },
+  { to: "/settings/partners", key: "nav.partners", icon: Building2 },
+];
+
+function navLinkClass({ isActive }: { isActive: boolean }) {
+  return cn(
+    "group relative flex items-center gap-2.5 px-4 py-2 text-sm font-medium transition-colors",
+    isActive ? "text-brand-primary" : "text-foreground/70 hover:bg-muted hover:text-foreground"
+  );
+}
+
+function NavTick({ isActive }: { isActive: boolean }) {
   return (
-    <aside className="hidden w-56 shrink-0 border-r border-border bg-card md:block">
-      <nav className="flex flex-col gap-1 p-3">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              cn(
-                "rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted",
-                isActive && "bg-brand-primary/10 text-brand-primary"
-              )
-            }
-          >
-            {item.label}
-          </NavLink>
-        ))}
+    <span
+      className={cn(
+        "absolute left-0 top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-brand-primary transition-opacity",
+        isActive ? "opacity-100" : "opacity-0"
+      )}
+    />
+  );
+}
+
+export function Sidebar() {
+  const { branding } = useTenantBranding();
+  const { t } = useTranslation();
+
+  return (
+    <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-card md:flex">
+      <div className="flex items-center gap-2.5 border-b border-border px-4 py-4">
+        {branding?.logoUrl ? (
+          <img
+            src={branding.logoUrl}
+            alt={branding.name}
+            className="h-8 w-8 rounded-sm object-cover"
+          />
+        ) : (
+          <div className="flex h-8 w-8 items-center justify-center rounded-sm bg-brand-primary font-display text-sm font-bold text-white">
+            {(branding?.name ?? "L").charAt(0)}
+          </div>
+        )}
+        <span className="truncate font-display text-[15px] font-semibold tracking-tight text-foreground">
+          {branding?.name ?? "Loopice"}
+        </span>
+      </div>
+
+      <nav className="flex flex-1 flex-col gap-0.5 py-3">
+        {navItems.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink key={item.to} to={item.to} end={item.end} className={navLinkClass}>
+              {({ isActive }) => (
+                <>
+                  <NavTick isActive={isActive} />
+                  <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+                  {t(item.key)}
+                </>
+              )}
+            </NavLink>
+          );
+        })}
+
+        <RoleGate allow={["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER"]}>
+          {dispatchItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink key={item.to} to={item.to} className={navLinkClass}>
+                {({ isActive }) => (
+                  <>
+                    <NavTick isActive={isActive} />
+                    <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+                    {t(item.key)}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </RoleGate>
+
+        <RoleGate
+          allow={["TENANT_ADMIN", "OPERATIONS_MANAGER", "DISPATCHER", "WAREHOUSE_STAFF", "FACILITY_SUPERVISOR"]}
+        >
+          {facilityItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink key={item.to} to={item.to} className={navLinkClass}>
+                {({ isActive }) => (
+                  <>
+                    <NavTick isActive={isActive} />
+                    <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+                    {t(item.key)}
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </RoleGate>
 
         <RoleGate allow={["TENANT_ADMIN"]}>
-          <div className="mt-4 border-t border-border pt-3">
-            <p className="px-3 pb-1 text-xs font-semibold uppercase text-muted-foreground">
-              Settings
+          <div className="mt-5 border-t border-border pt-4">
+            <p className="px-4 pb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground">
+              {t("nav.settings")}
             </p>
-            <NavLink
-              to="/settings/branding"
-              className={({ isActive }) =>
-                cn(
-                  "block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted",
-                  isActive && "bg-brand-primary/10 text-brand-primary"
-                )
-              }
-            >
-              Branding
-            </NavLink>
-            <NavLink
-              to="/settings/users"
-              className={({ isActive }) =>
-                cn(
-                  "block rounded-md px-3 py-2 text-sm font-medium text-foreground hover:bg-muted",
-                  isActive && "bg-brand-primary/10 text-brand-primary"
-                )
-              }
-            >
-              Users
-            </NavLink>
+            <div className="flex flex-col gap-0.5">
+              {settingsItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <NavLink key={item.to} to={item.to} className={navLinkClass}>
+                    {({ isActive }) => (
+                      <>
+                        <NavTick isActive={isActive} />
+                        <Icon className="h-4 w-4 shrink-0" strokeWidth={2} />
+                        {t(item.key)}
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </div>
           </div>
         </RoleGate>
       </nav>

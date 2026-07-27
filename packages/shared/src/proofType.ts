@@ -1,0 +1,13 @@
+export const PROOF_TYPES = [
+  "PHOTO",
+  "SIGNATURE",
+  "RECIPIENT_NAME",
+  "GPS_LOCATION",
+  "TIMESTAMP",
+  "QUANTITY_CONFIRMATION",
+  "CONDITION_CONFIRMATION",
+  "NOTE",
+  "DOCUMENT_ATTACHMENT",
+  "BARCODE_SCAN",
+] as const;
+export type ProofType = (typeof PROOF_TYPES)[number];

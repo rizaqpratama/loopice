@@ -3,20 +3,25 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 222 47% 11%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215 16% 47%;
-  --card: 0 0% 100%;
-  --card-foreground: 222 47% 11%;
-  --border: 214 32% 91%;
-  --input: 214 32% 91%;
-  --ring: 222 47% 11%;
-  --destructive: 0 84% 60%;
+  /* Loopice "manifest ledger" system -- grounded in the paperwork of the
+     actual subject (waybills, manifests, stamped status), not a generic
+     dark dev-tool palette. See DESIGN.md. */
+  --background: 40 18% 96%; /* manifest paper */
+  --foreground: 150 8% 14%; /* ledger ink */
+  --muted: 40 14% 91%; /* paper hover fill */
+  --muted-foreground: 150 6% 40%;
+  --card: 40 25% 99%; /* label stock */
+  --card-foreground: 150 8% 14%;
+  --border: 40 12% 85%; /* hairline */
+  --input: 40 12% 82%;
+  --ring: 150 8% 30%;
+  --destructive: 0 70% 45%;
   --destructive-foreground: 0 0% 100%;
-  --radius: 0.5rem;
+  --radius: 6px;
 
-  /* Whitelabel brand colors -- overridden per-tenant by TenantBrandingContext */
+  /* Whitelabel brand accent -- overridden per-tenant by TenantBrandingContext,
+     layered on top of the static neutral system above (CTAs, links, active
+     nav only -- status stamps stay semantic, not tenant-colored). */
   --brand-primary: #4f46e5;
   --brand-secondary: #1e293b;
 }
@@ -28,4 +33,15 @@
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
+  font-family:
+    "IBM Plex Sans",
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    sans-serif;
+}
+
+.font-display {
+  font-family: "Space Grotesk", system-ui, sans-serif;
 }
